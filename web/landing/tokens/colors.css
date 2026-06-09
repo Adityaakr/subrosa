@@ -1,0 +1,120 @@
+/* ==========================================================================
+   Obscura — Color tokens
+   Miden palette: orange #FF5500 on near-black, ash/white content grounds,
+   blue/green/violet accents reserved for diagrams + status tags.
+   --------------------------------------------------------------------------
+   Two tiers:
+     1. Base palette  — raw, brand-fixed values (--orange-500, --ink-900 …)
+     2. Semantic aliases — what components reference (--text-body, --surface-card …)
+   Light ground is the :root default. Add `data-theme="dark"` (or class
+   `.surface-dark`) to a section to flip the semantic layer for dark grounds.
+   ========================================================================== */
+
+:root {
+  /* --- Brand: Miden Orange --------------------------------------------- */
+  --orange-700: #CC4400;   /* pressed / deep */
+  --orange-600: #FF4D00;   /* deeper variant (brief) */
+  --orange-500: #FF5500;   /* PRIMARY — Miden Orange */
+  --orange-400: #FF7A36;   /* hover lift on dark */
+  --orange-300: #FFA877;   /* soft */
+  --orange-100: #FFE9DD;   /* tint ground */
+  --orange-50:  #FFF4EE;   /* faintest wash */
+
+  /* --- Ink / neutrals (warm near-black through ash) -------------------- */
+  --ink-900: #0C0C0E;      /* near-black — hero / dark sections */
+  --ink-850: #161618;      /* raised surface on dark */
+  --ink-800: #191919;      /* primary ink text */
+  --ink-700: #232325;
+  --ink-600: #333335;
+  --ink-500: #484848;      /* secondary text (brief) */
+  --ink-400: #6B6B6E;
+  --ink-300: #9A9A9C;
+  --ink-200: #C4C4C0;
+  --line-200: #E7E7E2;     /* lines / borders (brief) */
+  --ash-200: #F0F0EC;
+  --ash-100: #F7F7F5;      /* ash ground (brief) */
+  --ash-50:  #F9F9F9;      /* faint ground (brief) */
+  --white:   #FFFFFF;
+
+  /* --- Accents (sparingly — diagrams, tags, status) ------------------- */
+  --blue-500:   #066EFF;
+  --blue-100:   #E2EDFF;
+  --green-500:  #1F7A33;
+  --green-100:  #E1F1E4;
+  --violet-500: #A300D6;
+  --violet-100: #F4E1FB;
+
+  /* --- Alpha helpers (overlays, glows, grid on dark) ------------------ */
+  --orange-glow:   rgba(255, 85, 0, 0.18);
+  --blue-glow:     rgba(6, 110, 255, 0.16);
+  --dark-line:     rgba(255, 255, 255, 0.10);
+  --dark-line-2:   rgba(255, 255, 255, 0.06);
+  --dark-fill:     rgba(255, 255, 255, 0.04);
+  --scrim:         rgba(12, 12, 14, 0.64);
+
+  /* =====================================================================
+     SEMANTIC — light ground (default)
+     ===================================================================== */
+  --bg-page:        var(--ash-100);
+  --bg-sunken:      var(--ash-50);
+  --surface-card:   var(--white);
+  --surface-raised: var(--white);
+  --surface-inset:  var(--ash-50);
+
+  --text-strong:    var(--ink-900);
+  --text-body:      var(--ink-800);
+  --text-muted:     var(--ink-500);
+  --text-faint:     var(--ink-400);
+  --text-inverse:   var(--white);
+  --text-brand:     var(--orange-600);
+
+  --border:         var(--line-200);
+  --border-strong:  var(--ink-200);
+  --border-focus:   var(--orange-500);
+
+  --accent:         var(--orange-500);
+  --accent-hover:   var(--orange-400);
+  --accent-press:   var(--orange-700);
+  --accent-on:      var(--white);
+  --accent-tint:    var(--orange-50);
+
+  /* Status / privacy semantics */
+  --private:        var(--orange-500);   /* PRIVATE motif */
+  --public:         var(--blue-500);     /* PUBLIC motif */
+  --oracle:         var(--violet-500);   /* ORACLE motif */
+  --positive:       var(--green-500);
+  --negative:       var(--orange-600);
+
+  --ring:           rgba(255, 85, 0, 0.32);
+}
+
+/* =======================================================================
+   SEMANTIC — dark ground (hero / dark sections)
+   ======================================================================= */
+[data-theme="dark"],
+.surface-dark {
+  --bg-page:        var(--ink-900);
+  --bg-sunken:      #08080A;
+  --surface-card:   var(--ink-850);
+  --surface-raised: var(--ink-800);
+  --surface-inset:  rgba(255, 255, 255, 0.03);
+
+  --text-strong:    var(--white);
+  --text-body:      #EDEDEA;
+  --text-muted:     var(--ink-300);
+  --text-faint:     var(--ink-400);
+  --text-inverse:   var(--ink-900);
+  --text-brand:     var(--orange-500);
+
+  --border:         var(--dark-line);
+  --border-strong:  rgba(255, 255, 255, 0.18);
+  --border-focus:   var(--orange-500);
+
+  --accent:         var(--orange-500);
+  --accent-hover:   var(--orange-400);
+  --accent-press:   var(--orange-600);
+  --accent-on:      var(--white);
+  --accent-tint:    rgba(255, 85, 0, 0.12);
+
+  --ring:           rgba(255, 85, 0, 0.45);
+}
