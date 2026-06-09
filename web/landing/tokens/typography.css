@@ -1,0 +1,47 @@
+/* ==========================================================================
+   Obscura — Typography tokens
+   Display: Space Grotesk (geometric)  ·  Body: Inter  ·  Data/labels: JetBrains Mono
+   Short declarative headlines; monospace for data, tags and labels.
+   ========================================================================== */
+
+:root {
+  /* --- Families ------------------------------------------------------- */
+  --font-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --font-body:    "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono:    "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* --- Weights -------------------------------------------------------- */
+  --fw-regular:  400;  /* @kind font */
+  --fw-medium:   500;  /* @kind font */
+  --fw-semibold: 600;  /* @kind font */
+  --fw-bold:     700;  /* @kind font */
+
+  /* --- Type scale (px @ desktop) -------------------------------------- */
+  --fs-display-xl: 76px;   /* hero one-liner */
+  --fs-display-l:  56px;
+  --fs-display-m:  40px;
+  --fs-h1: 32px;
+  --fs-h2: 26px;
+  --fs-h3: 21px;
+  --fs-h4: 18px;
+  --fs-body-lg: 18px;
+  --fs-body:    16px;
+  --fs-body-sm: 14px;
+  --fs-caption: 13px;
+  --fs-label:   12px;   /* mono tags PRIVATE / PUBLIC / ORACLE */
+  --fs-micro:   11px;
+
+  /* --- Line heights --------------------------------------------------- */
+  --lh-tight:   1.02;   /* @kind font */ /* display */
+  --lh-snug:    1.16;   /* @kind font */ /* headings */
+  --lh-normal:  1.5;    /* @kind font */ /* body */
+  --lh-relaxed: 1.65;                  /* @kind font */
+  --lh-mono:    1.45;                  /* @kind font */
+
+  /* --- Letter spacing ------------------------------------------------- */
+  --ls-display: -0.022em;  /* @kind font */
+  --ls-heading: -0.012em;  /* @kind font */
+  --ls-body:    0em;       /* @kind font */
+  --ls-label:   0.14em;    /* @kind font */
+  --ls-mono:    0.01em;    /* @kind font */
+}
