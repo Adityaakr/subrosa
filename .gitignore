@@ -1,0 +1,25 @@
+# Rust
+/target
+**/target
+Cargo.lock
+
+# Miden client local state — NEVER commit keys
+store.sqlite3
+store.sqlite3-*
+keystore/
+miden-client.toml
+
+# Node
+node_modules/
+.next/
+dist/
+.DS_Store
+
+# Secrets
+.env
+.env.*
+*.key
+.miden/
+
+# local tooling
+.claude/
