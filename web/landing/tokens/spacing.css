@@ -1,0 +1,67 @@
+/* ==========================================================================
+   Obscura — Spacing, radii, borders, shadows, motion
+   Sharp, frontier-infra feel: restrained radii, 1px hairlines, subtle
+   shadows on light, soft orange/blue glows on dark.
+   ========================================================================== */
+
+:root {
+  /* --- Spacing (4px base) -------------------------------------------- */
+  --space-0:   0;
+  --space-1:   4px;
+  --space-2:   8px;
+  --space-3:   12px;
+  --space-4:   16px;
+  --space-5:   20px;
+  --space-6:   24px;
+  --space-8:   32px;
+  --space-10:  40px;
+  --space-12:  48px;
+  --space-16:  64px;
+  --space-20:  80px;
+  --space-24:  96px;
+  --space-32:  128px;
+
+  /* --- Radii (sharp; capped low) ------------------------------------- */
+  --radius-none: 0;
+  --radius-xs:  2px;
+  --radius-sm:  4px;
+  --radius-md:  8px;    /* default control / card */
+  --radius-lg:  12px;   /* large card / panel */
+  --radius-xl:  16px;
+  --radius-pill: 999px; /* tags, capsules */
+
+  /* --- Border widths -------------------------------------------------- */
+  --bw-hair:   1px;
+  --bw-thick:  2px;
+
+  /* --- Shadows (light ground — quiet) -------------------------------- */
+  --shadow-xs: 0 1px 2px rgba(12, 12, 14, 0.05);
+  --shadow-sm: 0 1px 3px rgba(12, 12, 14, 0.07), 0 1px 2px rgba(12, 12, 14, 0.04);
+  --shadow-md: 0 4px 14px rgba(12, 12, 14, 0.08), 0 1px 3px rgba(12, 12, 14, 0.05);
+  --shadow-lg: 0 16px 40px rgba(12, 12, 14, 0.12), 0 4px 12px rgba(12, 12, 14, 0.06);
+
+  /* --- Glows (dark ground — the brand light source) ------------------ */
+  --glow-orange: 0 0 0 1px rgba(255, 85, 0, 0.30), 0 8px 40px rgba(255, 85, 0, 0.22);
+  --glow-blue:   0 0 0 1px rgba(6, 110, 255, 0.28), 0 8px 40px rgba(6, 110, 255, 0.18);
+  --glow-soft:   0 12px 48px rgba(0, 0, 0, 0.55);
+
+  /* --- Focus ring ----------------------------------------------------- */
+  --focus-ring: 0 0 0 3px var(--ring);
+
+  /* --- Motion --------------------------------------------------------- */
+  --ease-out:   cubic-bezier(0.22, 1, 0.36, 1);   /* @kind other */
+  --ease-inout: cubic-bezier(0.65, 0, 0.35, 1); /* @kind other */
+  --dur-fast:   120ms; /* @kind other */
+  --dur-base:   180ms; /* @kind other */
+  --dur-slow:   280ms; /* @kind other */
+
+  /* --- Layout --------------------------------------------------------- */
+  --container:    1200px;
+  --container-sm: 880px;
+  --gutter:       24px;
+
+  /* --- Decorative: grid texture overlay ------------------------------ */
+  --grid-line:      rgba(12, 12, 14, 0.045);   /* @kind color */
+  --grid-line-dark: rgba(255, 255, 255, 0.045); /* @kind color */
+  --grid-size:      32px; /* @kind spacing */
+}
