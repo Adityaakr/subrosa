@@ -8,7 +8,7 @@ extern crate alloc;
 
 use miden::{component, felt, Felt, StorageValue};
 
-const YES: Felt = felt!(1);
+// Outcome encoding: YES = 1, NO = 0 (compared inline; `felt!` is not const-callable).
 
 #[component]
 struct Market {
@@ -27,7 +27,7 @@ impl Market {
     pub fn get_total_volume(&self) -> Felt { self.total_volume.get() }
 
     pub fn place(&mut self, side: Felt, amount: Felt) -> Felt {
-        if side == YES {
+        if side == felt!(1) {
             let r = self.yes_reserve.get();
             self.yes_reserve.set(r + amount);
         } else {
