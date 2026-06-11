@@ -30,6 +30,8 @@ impl Market {
     pub fn get_resolution(&self) -> Felt { self.resolution.get() }
 
     pub fn place(&mut self, side: Felt, amount: Felt) -> Felt {
+        // No betting once the market is resolved.
+        assert!(self.resolution.get() == felt!(0));
         if side == felt!(1) {
             let r = self.yes_reserve.get();
             self.yes_reserve.set(r + amount);
