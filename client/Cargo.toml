@@ -1,0 +1,14 @@
+[package]
+name = "obscura-client"
+version = "0.1.0"
+edition = "2021"
+description = "Obscura — Miden client: account/tx helpers and privacy verification"
+
+# Pinned to match the live testnet node (see docs/VERSIONS.md).
+[dependencies]
+miden-client = { version = "=0.14.9", features = ["tonic"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+
+[[bin]]
+name = "verify_privacy"
+path = "src/bin/verify_privacy.rs"
