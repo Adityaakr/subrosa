@@ -4,7 +4,8 @@ version = "0.1.0"
 edition = "2021"
 description = "Obscura — Miden client: account/tx helpers and privacy verification"
 
-# Pinned to match the live testnet node (see docs/VERSIONS.md).
+# Pinned to match the live testnet node (see docs/VERSIONS.md, DECISIONS D-008).
+# `tonic` feature provides the gRPC node client (GrpcClient).
 [dependencies]
 miden-client = { version = "=0.14.9", features = ["tonic"] }
 miden-client-sqlite-store = "=0.14.9"
@@ -17,3 +18,7 @@ path = "src/bin/verify_privacy.rs"
 [[bin]]
 name = "place_position"
 path = "src/bin/place_position.rs"
+
+[[bin]]
+name = "run_script"
+path = "src/bin/run_script.rs"
