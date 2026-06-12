@@ -7,8 +7,13 @@ description = "Obscura — Miden client: account/tx helpers and privacy verifica
 # Pinned to match the live testnet node (see docs/VERSIONS.md).
 [dependencies]
 miden-client = { version = "=0.14.9", features = ["tonic"] }
+miden-client-sqlite-store = "=0.14.9"
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 
 [[bin]]
 name = "verify_privacy"
 path = "src/bin/verify_privacy.rs"
+
+[[bin]]
+name = "place_position"
+path = "src/bin/place_position.rs"
