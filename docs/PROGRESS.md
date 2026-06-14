@@ -1,11 +1,15 @@
 # PROGRESS — phase status + DoD evidence
 
-## Phase 0 — Environment & "hello world"  ✅ COMPLETE
-- [x] Toolchain installed & pinned (midenup 0.2.0, client 0.14.x)
-- [x] Client configured for testnet (rpc.testnet.miden.io)
-- [x] First transaction committed and visible on testnet.midenscan.com
-- [x] NOTES_MIDEN.md written
+## Phase 0 — Environment  ✅
+First tx committed on testnet (explorer-verified). Toolchain pinned to 0.14.9.
 
-## Phase 1 — The magic moment  (in progress)
-- [ ] Custom market account (public reserves) + place procedure
-- [ ] Private position = commitment only on the node
+## Phase 1 — The magic moment  ✅ DEMONSTRATED
+- Custom Market account (Rust SDK → MASM) deployed PUBLIC; place() moves public
+  reserves on-chain via a custom transaction script.
+- Private position proven: node GetAccountDetails returns COMMITMENT ONLY for the
+  private account (client/verify_privacy).
+
+## Phase 2 — Real market  (in progress)
+- [x] resolution + optimistic resolve()
+- [x] redemption guard: winner redeems, loser aborts
+- [ ] real private payout from the pool
