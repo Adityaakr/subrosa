@@ -1,0 +1,10 @@
+# Normalize line endings
+* text=auto eol=lf
+
+*.png binary
+*.woff2 binary
+*.masp binary
+
+# Help GitHub language stats reflect the real work
+*.rs linguist-language=Rust
+docs/* linguist-documentation
