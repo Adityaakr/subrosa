@@ -1,0 +1,23 @@
+{
+  "name": "subrosa-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Subrosa confidential trading agent — autonomous private positions with Guardian-coordinated human co-sign above a size cap",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "start": "tsx src/agent.ts",
+    "guardian:up": "docker compose -f docker/guardian-compose.yml up --build -d",
+    "guardian:down": "docker compose -f docker/guardian-compose.yml down"
+  },
+  "dependencies": {
+    "@miden-sdk/miden-sdk": "0.14.5",
+    "@openzeppelin/guardian-client": "^0.14.9",
+    "@openzeppelin/miden-multisig-client": "^0.14.9"
+  },
+  "devDependencies": {
+    "@types/node": "^24.6.0",
+    "tsx": "^4.19.2",
+    "typescript": "~5.7.0"
+  }
+}
