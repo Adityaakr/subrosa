@@ -181,8 +181,62 @@ recipient via advice inputs) is documented in DECISIONS D-013 as the next refine
 
 Remaining pricing fast-follow: on-chain CPMM/LMSR (odds computed off-chain today).
 
-## Phase 3 — Web client  ☐
-## Phase 4 — Confidential agent  ☐
+## Phase 3 — Web client (browser proving + UI)  🟡 built, builds & serves
+
+Scaffolded with `create-miden-app` → **Vite + React 19 + TS** using the official
+web SDK on the **0.14 line** that matches the node: `@miden-sdk/miden-sdk`,
+`@miden-sdk/react`, `@miden-sdk/vite-plugin` (solves WASM bundling).
+(Spec suggested Next.js; the supported WASM path is Vite + the official plugin.)
+
+Built in `web/app/`:
+- `providers.tsx` — `MidenProvider` with a **local prover** → accounts/txs proved
+  **in-browser** (no wallet extension needed).
+- `hooks/useMarket.ts` — reads the deployed market's PUBLIC storage **live** from
+  the node: `getAccount → storage().getItem(slot).toU64s()` for
+  yes/no/volume/resolution. (Fresh open market `0x5ff0303f…480b`, 50/50.)
+- `components/Subrosa.tsx` — markets list, market detail with **live odds bar**,
+  bet ticket (YES/NO toggle, amount, payout preview), **"Place private position"**
+  (creates a PRIVATE account via `useCreateWallet({storageMode:"private"})` →
+  proved in-browser), a **PRIVACY SEAL** ("only a commitment is recorded"), and a
+  PRIVATE "your positions" view. Brand-styled (`subrosa.css`).
+
+**Verified here:** `npm install`, `npm run build` (tsc typecheck + vite bundle,
+incl. the 14 MB WASM + proving web-worker) and the dev server (HTTP 200) all
+succeed.
+**Needs a browser to confirm (can't drive headless from CLI):** WASM init, the
+live odds fetch, and the in-browser proving click-through. Run:
+`cd web/app && npm install && npm run dev` → http://localhost:5173.
+
+**DoD remaining:** confirm the in-browser place-position proving end-to-end in a
+browser, and wire the on-chain market `place` call from the local wallet (the
+read path + private-account proving are done; the custom-tx submit reuses the
+proven `scripts/place_*` pattern).
+## Phase 4 — Confidential agent + Guardian co-sign  🟡 built, typechecks
+
+`agent/` (TypeScript) — an agent that trades from a private account with a
+programmable-auth guardrail, using self-hosted **OpenZeppelin Guardian** for the
+human co-sign above the cap.
+- `strategy.ts` — off-chain "brain" (trivial value strategy; pluggable).
+- `onchain.ts` — reads live public odds + places **sub-cap** trades via the
+  proven `miden-client` / `run_script` path (Phase 2).
+- `guardian.ts` — **above-cap** co-sign via `@openzeppelin/miden-multisig-client`
+  (createP2idProposal → signProposal → syncProposals → executeProposal), self-hosted Guardian.
+- `agent.ts` — decision loop routing by size vs `AUTONOMOUS_CAP`.
+- `docker/guardian-compose.yml` + `docs/GUARDIAN.md` — self-host topology.
+
+**Key verified finding (D-015):** Miden multisig has **no native
+size-conditional threshold**, so the cap is enforced app-side via a two-account
+model (1-of-1 agent ≤ cap; 2-of-N agent+human Guardian multisig > cap).
+
+**Verified here:** `npm install` (deps incl. `@openzeppelin/miden-multisig-client`
+0.14.9 + `@miden-sdk/miden-sdk` 0.14.5) + `npm run typecheck` pass — the agent
+compiles against the real Guardian/SDK API surface.
+**Needs live run to confirm (documented):** self-hosted Guardian server (docker)
++ a human co-signer for the above-cap path; the `FalconSigner`/`AuthSecretKey`
+constructor at runtime; the autonomous path against a funded agent account.
+
+**DoD remaining:** stand up Guardian + create the 2-of-N account + drive an
+above-cap trade through human co-sign to on-chain finalize.
 ## Phase 5 — Capital layer + demo  ☐
 
 ---

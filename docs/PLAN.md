@@ -57,8 +57,8 @@ Component → Miden primitive map lives in [`NOTES_MIDEN.md`](./NOTES_MIDEN.md) 
 | **0** | Environment & "hello world" | ✅ Complete — deploy tx committed @ block 1636241 on testnet |
 | **1** | ★ Magic moment: public odds move on-chain + private position is commitment-only | ✅ Demonstrated on testnet (see PROGRESS) |
 | **2** | Real market: reserves/odds · resolve · redemption guard | ✅ Demonstrated on testnet (market v3; winner redeems, loser aborts) |
-| **3** | Web client: browser proving + minimal UI | ☐ |
-| **4** | Confidential agent + programmable-auth guardrails | ☐ |
+| **3** | Web client: browser proving + minimal UI | 🟡 Built (Vite+React+web SDK); builds & serves — browser click-through pending |
+| **4** | Confidential agent + Guardian co-sign guardrail | 🟡 Built (agent + Guardian SDK); typechecks — live co-sign pending |
 | **5** | Capital layer (Cusp), polish, demo + tutorial | ☐ |
 
 ### Phase 0 — Environment & "hello world"  ✅ COMPLETE
