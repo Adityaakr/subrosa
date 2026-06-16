@@ -1,10 +1,16 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { MidenProvider } from "@miden-sdk/react";
-import { MidenFiSignerProvider } from "@miden-sdk/miden-wallet-adapter-react";
+import { WalletProvider } from "@miden-sdk/miden-wallet-adapter-react";
+import { MidenWalletAdapter } from "@miden-sdk/miden-wallet-adapter-miden";
 import { WalletAdapterNetwork } from "@miden-sdk/miden-wallet-adapter-base";
 import { MIDEN_RPC_URL, MIDEN_PROVER, APP_NAME } from "./config";
 import "./proto/proto.css";
+
+// Provide the wallet-adapter CONTEXT (so the Miden Wallet option works) WITHOUT
+// the SignerProvider that bridges into MidenProvider — that bridge expects an
+// external wallet and breaks the built-in local-keystore client.
+const walletAdapters = [new MidenWalletAdapter({ appName: APP_NAME })];
 
 // Load the prototype modules in order so their window.* exports are populated
 // before <App/> renders (icons → data → ui → market → seal → portfolio → app).
@@ -22,7 +28,7 @@ const midenConfig = { rpcUrl: MIDEN_RPC_URL, prover: MIDEN_PROVER };
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <MidenFiSignerProvider appName={APP_NAME} network={WalletAdapterNetwork.Testnet} autoConnect={false}>
+    <WalletProvider wallets={walletAdapters} network={WalletAdapterNetwork.Testnet} autoConnect={false}>
       <MidenProvider
         config={midenConfig}
         loadingComponent={<div className="backdrop" />}
@@ -30,6 +36,6 @@ createRoot(document.getElementById("root")!).render(
         <div className="backdrop" />
         <App />
       </MidenProvider>
-    </MidenFiSignerProvider>
+    </WalletProvider>
   </StrictMode>,
 );

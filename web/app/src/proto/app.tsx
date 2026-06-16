@@ -193,21 +193,14 @@ function App() {
     committed.current = false;
     setRealTx(null);
     setSeal({ order });
-    // Real on-chain tx in parallel (private account + position note). The seal
-    // animation plays regardless; the real hash appears when it lands. Signs
-    // from whichever wallet is active (MidenFi via the bridged signer, else the
-    // built-in private account).
+    // Real on-chain tx in parallel. Positions are always placed from the
+    // built-in PRIVATE account (on-theme: the chain only sees a commitment),
+    // regardless of which wallet is shown for identity/balance.
     (async () => {
       try {
-        let signerRef, senderId;
-        if (mf.connected && mf.address) {
-          signerRef = mf.address;
-          senderId = AccountId.fromHex(mf.address);
-        } else {
-          const acct = await builtin.connect();
-          signerRef = acct.id();
-          senderId = acct.id();
-        }
+        const acct = await builtin.connect();
+        const signerRef = acct.id();
+        const senderId = acct.id();
         const masp = order.side === "YES" ? "/packages/place_note.masp" : "/packages/place_no_note.masp";
         const buf = await fetch(masp).then((r) => r.arrayBuffer());
         const ns = NoteScript.fromPackage(Package.deserialize(new Uint8Array(buf)));
