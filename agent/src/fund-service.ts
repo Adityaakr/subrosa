@@ -10,9 +10,14 @@
 import { createServer } from "node:http";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
 import { MIDEN_CLI, OBX_FAUCET_HEX } from "./config.js";
 
 const run = promisify(execFile);
+// The CLI's store/keystore (.miden/) is resolved from the repo root — run the
+// CLI there, same as agent/src/onchain.ts.
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const PORT = Number(process.env.FUND_PORT ?? "8787");
 const AMOUNT = process.env.FUND_AMOUNT ?? "1000"; // OBX base units per request
 const CORS = {
@@ -29,8 +34,8 @@ async function mint(address: string): Promise<string> {
   const { stdout } = await run(
     MIDEN_CLI,
     ["mint", "--target", address, "--asset", `${AMOUNT}::${OBX_FAUCET_HEX}`,
-     "--note-type", "public", "--force", "--delegate-proving"],
-    { cwd: process.cwd(), timeout: 180_000 },
+     "--note-type", "public", "--force"],
+    { cwd: ROOT, timeout: 300_000 },
   );
   const m = stdout.match(/0x[0-9a-f]{2,}/i);
   return m ? m[0] : stdout.trim().slice(0, 200);
