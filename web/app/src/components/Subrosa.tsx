@@ -1,18 +1,35 @@
 import { useMemo, useState } from "react";
-import { useMiden, useSyncState, useCreateWallet } from "@miden-sdk/react";
-import { type Account } from "@miden-sdk/miden-sdk";
-import { MARKETS, type Market, EXPLORER_BASE_URL } from "@/config";
+import { useMiden, useSyncState, useCreateWallet, useTransaction } from "@miden-sdk/react";
+import {
+  type Account,
+  AccountId,
+  Package,
+  NoteScript,
+  Note,
+  NoteAssets,
+  NoteMetadata,
+  NoteRecipient,
+  NoteStorage,
+  NoteTag,
+  NoteType,
+  NoteArray,
+  FeltArray,
+  TransactionRequestBuilder,
+} from "@miden-sdk/miden-sdk";
+import { MARKETS, type Market, EXPLORER_BASE_URL, MARKET_ID_HEX } from "@/config";
 import { useMarket } from "@/hooks/useMarket";
+import { randomWord } from "@/lib/miden";
 import "./subrosa.css";
 
 type Side = "yes" | "no";
-type Position = { market: string; side: Side; amount: number; account: string };
+type Position = { market: string; side: Side; amount: number; account: string; tx?: string };
 
 export function Subrosa() {
   const { isReady, isInitializing, error } = useMiden();
   const { syncHeight } = useSyncState();
   const market = useMarket();
   const { createWallet, isCreating } = useCreateWallet();
+  const { execute } = useTransaction();
 
   const [selected, setSelected] = useState<Market | null>(null);
   const [side, setSide] = useState<Side>("yes");
@@ -52,11 +69,34 @@ export function Subrosa() {
         acct = await createWallet({ storageMode: "private" });
         setTrader(acct);
       }
+
+      // Submit a REAL on-chain transaction from the trader's private account:
+      // it outputs the position note (addressed to the market) and, by being
+      // submitted, DEPLOYS the trader account on-chain (commitment only). This
+      // gives a verifiable tx hash + makes the account real on the explorer.
+      // Fixed-amount notes in v1 (dynamic Felt note inputs hit a midenc f32 limit).
+      const masp = side === "yes" ? "/packages/place_note.masp" : "/packages/place_no_note.masp";
+      const placedAmount = side === "yes" ? 250 : 100;
+      const buf = await fetch(masp).then((r) => r.arrayBuffer());
+      const pkg = Package.deserialize(new Uint8Array(buf));
+      const noteScript = NoteScript.fromPackage(pkg);
+      const marketId = AccountId.fromHex(MARKET_ID_HEX);
+      const recipient = new NoteRecipient(randomWord(), noteScript, new NoteStorage(new FeltArray()));
+      const tag = NoteTag.withAccountTarget(marketId);
+      const metadata = new NoteMetadata(acct.id(), NoteType.Private, tag);
+      const note = new Note(new NoteAssets(), metadata, recipient);
+      const request = new TransactionRequestBuilder()
+        .withOwnOutputNotes(new NoteArray([note]))
+        .build();
+
+      const result = await execute({ accountId: acct.id(), request });
+
       const pos: Position = {
         market: selected.question,
         side,
-        amount: Number(amount) || 0,
+        amount: placedAmount,
         account: acct.id().toString(),
+        tx: result.transactionId,
       };
       setPositions((p) => [pos, ...p]);
       setLastSeal(pos);
@@ -119,12 +159,12 @@ export function Subrosa() {
           ) : (
             <div className="sr-ticket">
               <div className="sr-side">
-                <button className={side === "yes" ? "on yes" : ""} onClick={() => setSide("yes")}>YES</button>
-                <button className={side === "no" ? "on no" : ""} onClick={() => setSide("no")}>NO</button>
+                <button className={side === "yes" ? "on yes" : ""} onClick={() => { setSide("yes"); setAmount("250"); }}>YES</button>
+                <button className={side === "no" ? "on no" : ""} onClick={() => { setSide("no"); setAmount("100"); }}>NO</button>
               </div>
               <label className="sr-amt">
-                <span className="mono">AMOUNT (OBX)</span>
-                <input value={amount} inputMode="numeric" onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ""))} />
+                <span className="mono">AMOUNT (OBX) · fixed in v1</span>
+                <input value={amount} readOnly />
               </label>
               <div className="sr-payout mono">
                 <span>est. payout if {side.toUpperCase()} wins</span>
@@ -224,16 +264,26 @@ function PrivacySeal({ pos }: { pos: Position }) {
       </div>
       <p className="sr-seal-text">
         Your {pos.side.toUpperCase()} position of {pos.amount} OBX was placed from a private account,
-        proved locally in your browser. On-chain the network records <b>only a commitment</b> —
-        no holder, no side, no size.
+        proved locally in your browser and <b>submitted on-chain</b>. The network records{" "}
+        <b>only a commitment</b> — no holder, no side, no size.
       </p>
+      {pos.tx && (
+        <a
+          className="sr-seal-acct mono sr-link"
+          href={`${EXPLORER_BASE_URL}/tx/${pos.tx}`}
+          target="_blank"
+          rel="noreferrer"
+        >
+          transaction {short(pos.tx)} · view on explorer ↗
+        </a>
+      )}
       <a
         className="sr-seal-acct mono sr-link"
         href={`${EXPLORER_BASE_URL}/account/${pos.account}`}
         target="_blank"
         rel="noreferrer"
       >
-        private acct {short(pos.account)} · commitment only · view on explorer ↗
+        private acct {short(pos.account)} · commitment only ↗
       </a>
       <p className="sr-seal-text" style={{ marginBottom: 0 }}>
         Settle the public odds on-chain (operator step):
