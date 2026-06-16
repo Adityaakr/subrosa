@@ -59,7 +59,7 @@ Component → Miden primitive map lives in [`NOTES_MIDEN.md`](./NOTES_MIDEN.md) 
 | **2** | Real market: reserves/odds · resolve · redemption guard | ✅ Demonstrated on testnet (market v3; winner redeems, loser aborts) |
 | **3** | Web client: browser proving + minimal UI | 🟡 Built (Vite+React+web SDK); builds & serves — browser click-through pending |
 | **4** | Confidential agent + Guardian co-sign guardrail | 🟡 Built (agent + Guardian SDK); typechecks — live co-sign pending |
-| **5** | Capital layer (Cusp), polish, demo + tutorial | ☐ |
+| **5** | Demo + tutorial ✅ (DevRel artifact) · Cusp LP layer ☐ | 🟡 demo/tutorial done; LP layer remaining |
 
 ### Phase 0 — Environment & "hello world"  ✅ COMPLETE
 **DoD:** a transaction you initiated is visible on testnet explorer; you can

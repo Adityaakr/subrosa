@@ -237,7 +237,19 @@ constructor at runtime; the autonomous path against a funded agent account.
 
 **DoD remaining:** stand up Guardian + create the 2-of-N account + drive an
 above-cap trade through human co-sign to on-chain finalize.
-## Phase 5 — Capital layer + demo  ☐
+## Phase 5 — Demo + tutorial  ✅ (Cusp LP layer ☐)
+
+The DevRel artifact — grounded entirely in verified, on-chain evidence:
+- `docs/TUTORIAL.md` — "Building Subrosa on Miden": the build log (env +
+  version-matching, the private-position magic moment, the real market
+  lifecycle, the web app + its 3 real fixes, the agent + Guardian), honest about
+  proven-vs-pending, with real tx hashes.
+- `docs/DEMO.md` — 90-second demo script + a "proof, no trust required"
+  checklist (public artifacts on the explorer; private accounts = commitment
+  only; loser-redeem aborts).
+
+Remaining: Cusp-style LP/capital layer (deposit collateral → back the pool →
+earn fees); recorded video; on-chain CPMM/LMSR pricing.
 
 ---
 

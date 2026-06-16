@@ -9,4 +9,7 @@ of truth for *Miden APIs* is NOTES_MIDEN.md + the live docs.
 - **DECISIONS.md** — design choices + rationale (D-001 … D-013).
 - **VERSIONS.md** — pinned toolchain & crate versions (and why).
 - **NOTES_MIDEN.md** — verified Miden model + the real client/SDK API surface.
-- **DEMO.md** — clickable testnet verification checklist.
+- **DEMO.md** — 90-second demo script + clickable testnet verification checklist.
+- **TUTORIAL.md** — "Building Subrosa on Miden": the full build log, grounded in
+  real tx hashes (the DevRel artifact).
+- **GUARDIAN.md** — Guardian co-sign integration design (Phase 4).
