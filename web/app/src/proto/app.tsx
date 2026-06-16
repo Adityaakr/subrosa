@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React from "react";
-import { useCreateWallet, useCreateFaucet, useMint, useTransaction, useAccount, useAccounts, useConsume, useSyncState, useNotes, formatAssetAmount, parseAssetAmount, accountIdsEqual } from "@miden-sdk/react";
+import { useCreateWallet, useCreateFaucet, useMint, useTransaction, useAccount, useAccounts, useConsume, useSyncState, useNotes, useMiden, formatAssetAmount, parseAssetAmount, accountIdsEqual } from "@miden-sdk/react";
 import { useWallet as useMidenFiAdapter } from "@miden-sdk/miden-wallet-adapter-react";
 import { WalletAdapterNetwork, PrivateDataPermission } from "@miden-sdk/miden-wallet-adapter-base";
 import {
@@ -17,6 +17,37 @@ const WALLET_LS = "subrosa.wallet.id";
 // made automatically — no manual storage clearing needed.
 const FAUCET_LS = "subrosa.faucet.v2.id";
 const FUND_DECIMALS = 8;
+
+// Public storage slots exported by the market component (read for live odds).
+const SLOT_YES = "miden_market::market::yes_reserve";
+const SLOT_NO = "miden_market::market::no_reserve";
+const SLOT_VOL = "miden_market::market::total_volume";
+const SLOT_RES = "miden_market::market::resolution";
+
+const wordToBig = (w) => { try { return w ? w.toU64s()[0] : 0n; } catch (e) { return 0n; } };
+
+// Read a market account's public state straight from the chain: reserves →
+// CPMM odds (YES% = no/(yes+no)), cumulative volume, and resolution.
+async function readMarketState(client, marketIdHex) {
+  const id = AccountId.fromHex(marketIdHex);
+  // Foreign public account: import it into the store (fetches from network) if
+  // we don't track it yet, then read its committed storage.
+  let acct = await wasmRetry(() => client.getAccount(id));
+  if (!acct) {
+    try { await wasmRetry(() => client.importAccountById(id)); } catch (e) {}
+    acct = await wasmRetry(() => client.getAccount(id));
+  }
+  if (!acct) throw new Error("market account not found: " + marketIdHex);
+  const st = acct.storage();
+  const slot = (name) => { try { return st.getItem(name); } catch (e) { return undefined; } };
+  const yes = wordToBig(slot(SLOT_YES));
+  const no = wordToBig(slot(SLOT_NO));
+  const volume = wordToBig(slot(SLOT_VOL));
+  const resolution = Number(wordToBig(slot(SLOT_RES)));
+  const total = yes + no;
+  const yesPct = total > 0n ? Number((no * 10000n) / total) / 100 : 50;
+  return { yes: Number(yes), no: Number(no), volume: Number(volume), resolution, yesPct, liquidity: Number(total) };
+}
 
 // The Miden WASM client is single-instance and rejects a call that overlaps an
 // in-flight one ("recursive use of an object … unsafe aliasing"). That borrow
@@ -252,6 +283,13 @@ function App() {
   const builtin = useWallet();
   const mf = useMidenFi();
   const { execute } = useTransaction();
+  const { client, isReady } = useMiden();
+
+  // Expose a live market reader (used by the headless read-test; also the basis
+  // for the live-odds UI wiring in the next step).
+  React.useEffect(() => {
+    if (isReady && client) window.__subrosaReadMarket = (hex) => readMarketState(client, hex || MARKET_ID_HEX);
+  }, [isReady, client]);
   const [mfFunding, setMfFunding] = React.useState(false);
   const [mfFundMsg, setMfFundMsg] = React.useState(null);
 
