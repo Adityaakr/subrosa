@@ -1,0 +1,35 @@
+# Self-host the OpenZeppelin Guardian server for Subrosa's co-sign path.
+#
+# Guardian is non-custodial (it coordinates + acknowledges; it never holds a
+# spending key). We SELF-HOST it so private position/delta payloads never leave
+# infrastructure we control — Guardian is a resilience/coordination layer for
+# us, NOT a privacy layer (see docs/GUARDIAN.md).
+#
+# Setup (one time):
+#   git clone https://github.com/OpenZeppelin/guardian ../guardian
+#   GUARDIAN_REPO=../guardian docker compose -f docker/guardian-compose.yml up --build -d
+#
+# The upstream repo also ships its own docker-compose.yml; this wrapper just
+# points a build context at your clone and pins the network to testnet.
+# HTTP → :3000, gRPC → :50051.  Verify: curl http://localhost:3000/pubkey
+
+services:
+  guardian:
+    build:
+      context: ${GUARDIAN_REPO:-../guardian}
+    ports:
+      - "3000:3000"
+      - "50051:50051"
+    environment:
+      GUARDIAN_NETWORK_TYPE: MidenTestnet
+      GUARDIAN_MAX_PENDING_PROPOSALS_PER_ACCOUNT: "20"
+      RUST_LOG: info
+    volumes:
+      - guardian-storage:/var/guardian/storage
+      - guardian-metadata:/var/guardian/metadata
+      - guardian-keystore:/var/guardian/keystore
+
+volumes:
+  guardian-storage:
+  guardian-metadata:
+  guardian-keystore:
