@@ -24,7 +24,11 @@ import App from "./proto/app.tsx";
 
 // Connect straight to testnet. The COEP `credentialless` header (vite.config)
 // lets the browser load these CORS-enabled cross-origin endpoints directly.
-const midenConfig = { rpcUrl: MIDEN_RPC_URL, prover: MIDEN_PROVER };
+// autoSyncInterval: 0 disables the background poll. The Miden WASM client is
+// single-instance and crashes on concurrent calls ("recursive use of an
+// object"); a periodic sync firing mid-mint/consume is exactly that collision.
+// We sync explicitly inside the flows instead.
+const midenConfig = { rpcUrl: MIDEN_RPC_URL, prover: MIDEN_PROVER, autoSyncInterval: 0 };
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

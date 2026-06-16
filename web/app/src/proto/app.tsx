@@ -14,6 +14,26 @@ const OBX_FAUCET_HEX = "0x1201d9f8819d5220778535e4e2f08a";
 const WALLET_LS = "subrosa.wallet.id";
 const FAUCET_LS = "subrosa.faucet.id"; // per-browser test-OBX faucet (web SDK)
 const FUND_DECIMALS = 8;
+
+// The Miden WASM client is single-instance and rejects a call that overlaps an
+// in-flight one ("recursive use of an object … unsafe aliasing"). That borrow
+// check fires BEFORE the call runs, so the client stays valid — wait for the
+// other op (e.g. an auto-query) to finish and retry.
+async function wasmRetry(fn, tries = 10) {
+  let last;
+  for (let i = 0; i < tries; i++) {
+    try { return await fn(); }
+    catch (e) {
+      last = e;
+      if (/recursive use|unsafe aliasing/i.test(String(e?.message || e))) {
+        await new Promise((r) => setTimeout(r, 500));
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw last;
+}
 const shortHex = (s) => (s && s.length > 14 ? `${s.slice(0, 8)}…${s.slice(-4)}` : s);
 
 /* Real built-in browser wallet: a persisted private testnet account whose ID +
@@ -100,13 +120,16 @@ function useWallet() {
   };
 
   // Reuse the persisted test faucet if it's still in the store, else create one.
+  // maxSupply is in BASE units and must exceed everything we ever mint:
+  // 1000 OBX * 10^8 = 1e11 per fund, so give it ample headroom (1e16).
   const ensureFaucet = async () => {
     if (faucetId && list.find((a) => sameId(a, faucetId))) return faucetId;
     setFundMsg("Creating test faucet…");
-    const f = await createFaucet({ tokenSymbol: "OBX", decimals: FUND_DECIMALS, maxSupply: 1_000_000_000n, storageMode: "public" });
+    const f = await wasmRetry(() => createFaucet({ tokenSymbol: "OBX", decimals: FUND_DECIMALS, maxSupply: 10_000_000_000_000_000n, storageMode: "public" }));
     const fid = idOf(f);
     try { localStorage.setItem(FAUCET_LS, fid); } catch (e) {}
     setFaucetId(fid);
+    try { await wasmRetry(() => sync()); } catch (e) {}
     return fid;
   };
 
@@ -120,16 +143,16 @@ function useWallet() {
     try {
       const fid = await ensureFaucet();
       setFundMsg("Minting 1,000 OBX…");
-      await mint({ targetAccountId: id, faucetId: fid, amount: parseAssetAmount("1000", FUND_DECIMALS), noteType: "private" });
+      await wasmRetry(() => mint({ targetAccountId: id, faucetId: fid, amount: parseAssetAmount("1000", FUND_DECIMALS), noteType: "private" }));
       setFundMsg("Claiming…");
       let claimed = false;
       for (let i = 0; i < 12; i++) {
         await new Promise((res) => setTimeout(res, 2500));
-        try { await sync?.(); } catch (e) {}
+        try { await wasmRetry(() => sync()); } catch (e) {}
         try { await notes.refetch?.(); } catch (e) {}
         const ids = (notesRef.current || []).map((s) => s.id).filter(Boolean);
         if (ids.length) {
-          await consume({ accountId: id, notes: ids });
+          await wasmRetry(() => consume({ accountId: id, notes: ids }));
           claimed = true;
           break;
         }
