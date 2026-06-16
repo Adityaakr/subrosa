@@ -82,7 +82,9 @@ body { margin: 0; background: var(--white); color: var(--ink2); font-family: var
 /* positions */
 .sr-positions { margin-top: 30px; }
 .sr-positions h4 { font-size: 11px; letter-spacing: .12em; color: var(--muted); display: flex; align-items: center; gap: 10px; margin: 0 0 12px; }
-.sr-pos { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); }
+.sr-pos { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); text-decoration: none; color: inherit; cursor: pointer; }
+.sr-pos:hover { background: var(--ash); }
+.sr-link { cursor: pointer; }
 .sr-pos-side { font-family: var(--mono); font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 6px; }
 .sr-pos-side.yes { color: #16a34a; background: rgba(22,163,74,.1); }
 .sr-pos-side.no { color: #e5484d; background: rgba(229,72,77,.1); }

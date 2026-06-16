@@ -197,11 +197,18 @@ function Positions({ positions }: { positions: Position[] }) {
     <div className="sr-positions">
       <h4 className="mono">YOUR POSITIONS <span className="sr-tag sr-tag-private">PRIVATE</span></h4>
       {positions.map((p, i) => (
-        <div className="sr-pos" key={i}>
+        <a
+          className="sr-pos"
+          key={i}
+          href={`${EXPLORER_BASE_URL}/account/${p.account}`}
+          target="_blank"
+          rel="noreferrer"
+          title="view this private account on the explorer (commitment only)"
+        >
           <span className={`sr-pos-side ${p.side}`}>{p.side.toUpperCase()}</span>
           <span className="sr-pos-q">{p.market}</span>
-          <span className="mono sr-pos-amt">{p.amount} OBX</span>
-        </div>
+          <span className="mono sr-pos-amt">{p.amount} OBX ↗</span>
+        </a>
       ))}
       <p className="sr-muted mono">Only you can see these — the network stores only a commitment.</p>
     </div>
@@ -220,7 +227,14 @@ function PrivacySeal({ pos }: { pos: Position }) {
         proved locally in your browser. On-chain the network records <b>only a commitment</b> —
         no holder, no side, no size.
       </p>
-      <code className="sr-seal-acct mono">private acct {short(pos.account)} · commitment only</code>
+      <a
+        className="sr-seal-acct mono sr-link"
+        href={`${EXPLORER_BASE_URL}/account/${pos.account}`}
+        target="_blank"
+        rel="noreferrer"
+      >
+        private acct {short(pos.account)} · commitment only · view on explorer ↗
+      </a>
       <p className="sr-seal-text" style={{ marginBottom: 0 }}>
         Settle the public odds on-chain (operator step):
       </p>
