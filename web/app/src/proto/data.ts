@@ -57,21 +57,15 @@
   ];
   markets.forEach((m) => { m.history = series(m.yes, 40, 3.2); });
 
-  // the holder's private book (pre-seeded)
-  const positions = [
-    { id: "p-btc", marketId: "btc-ath", side: "NO", size: 80, avg: 61, shares: 131.1, pnl: +18.4, value: 98.4, commitment: "0x4a1c…b7e3", revealed: false },
-    { id: "p-wc", marketId: "wc-final", side: "YES", size: 120, avg: 49, shares: 244.9, pnl: -6.2, value: 113.8, commitment: "0xc90f…21a8", revealed: false },
-    // On the resolved Fed market (YES won): a winning YES position (redeemable)
-    // and a losing NO position (the contract will reject its redemption).
-    { id: "p-fed-yes", marketId: "fed-sep", side: "YES", size: 200, avg: 45, shares: 444.4, pnl: +21.6, value: 243.2, commitment: "0x7b2e…44a1", revealed: false },
-    { id: "p-fed-no", marketId: "fed-sep", side: "NO", size: 90, avg: 55, shares: 163.6, pnl: -100, value: 0, commitment: "0x1c5d…90f2", revealed: false },
-  ];
+  // The holder's private book starts EMPTY — it fills with the REAL positions
+  // you place (each a real on-chain commitment). Nothing pre-seeded/mock.
+  const positions = [];
 
+  // The one real agent: the Node runner with an OpenRouter brain. Trades sub-cap
+  // autonomously; above the cap a human co-signs via Guardian. (Runs server-side;
+  // this is its real configuration, not a fabricated fleet.)
   const agents = [
-    { id: "a1", name: "delta-neutral-01", strat: "Delta-neutral basket", status: "active", cap: 5000, deployed: 3180, cosign: false, markets: 14, since: "12d" },
-    { id: "a2", name: "sharp-fade-02", strat: "Fade the crowd", status: "active", cap: 2500, deployed: 1420, cosign: false, markets: 8, since: "6d" },
-    { id: "a3", name: "macro-momentum", strat: "Momentum on macro", status: "paused", cap: 25000, deployed: 0, cosign: true, markets: 5, since: "21d" },
-    { id: "a4", name: "oracle-arb-09", strat: "Resolution arbitrage", status: "active", cap: 12000, deployed: 8640, cosign: true, markets: 21, since: "30d" },
+    { id: "subrosa-01", name: "subrosa-agent-01", strat: "OpenRouter LLM over live on-chain odds", status: "active", cap: 500, deployed: 0, cosign: true, markets: 3, since: "live" },
   ];
 
   const CAT_COLOR = {

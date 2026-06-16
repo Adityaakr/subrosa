@@ -322,7 +322,6 @@ function App() {
   const [route, setRoute] = React.useState("markets");
   const [market, setMarket] = React.useState(null);
   const [positions, setPositions] = React.useState(() => window.OBS.positions.map((p) => ({ ...p })));
-  const [balance, setBalance] = React.useState(2480);
   const [seal, setSeal] = React.useState(null); // {order}
   const [realTx, setRealTx] = React.useState(null); // {tx, account}
   const committed = React.useRef(false);
@@ -403,6 +402,8 @@ function App() {
     disconnect: () => (kind === "midenfi" ? mf.disconnect() : builtin.disconnect()),
     fund: kind === "midenfi" ? fundMidenFi : builtin.fund,
   };
+  // Real spendable balance (OBX) from the connected wallet — drives the bet panel.
+  const liveBalance = Number(String(wallet.balanceLabel || "0").replace(/[, ]/g, "")) || 0;
 
   const go = (r) => { if (r !== "detail") setMarket(null); setRoute(r); };
   const openMarket = (m) => { setMarket(m); setRoute("detail"); };
@@ -411,7 +412,7 @@ function App() {
   // run (operator redeem-service); the contract's redeem() guard only succeeds
   // for the winning side, so losing redemptions are rejected on-chain.
   const redeem = async (pos) => {
-    const market = LIVE_MARKETS[pos.marketId];
+    const market = pos.marketAccount || LIVE_MARKETS[pos.marketId];
     if (!market) { window.txToast?.({ kind: "error", title: "Not redeemable here", desc: "This market isn't backed by a live on-chain account." }); return; }
     const side = String(pos.side || "").toLowerCase();
     setPositions((ps) => ps.map((p) => (p.id === pos.id ? { ...p, redeeming: true } : p)));
@@ -440,20 +441,24 @@ function App() {
         const acct = await builtin.connect();
         const signerRef = acct.id();
         const senderId = acct.id();
+        // Target the viewed market's real on-chain account when it's live;
+        // otherwise the default market. Record it so the position is tied to a
+        // real market (and can be redeemed there if it resolves).
+        const marketHex = (order.market && LIVE_MARKETS[order.market.id]) || MARKET_ID_HEX;
         const masp = order.side === "YES" ? "/packages/place_note.masp" : "/packages/place_no_note.masp";
         const buf = await fetch(masp).then((r) => r.arrayBuffer());
         const ns = NoteScript.fromPackage(Package.deserialize(new Uint8Array(buf)));
-        const mid = AccountId.fromHex(MARKET_ID_HEX);
+        const mid = AccountId.fromHex(marketHex);
         const rec = new NoteRecipient(randomWord(), ns, new NoteStorage(new FeltArray()));
         const meta = new NoteMetadata(senderId, NoteType.Private, NoteTag.withAccountTarget(mid));
         const note = new Note(new NoteAssets(), meta, rec);
         const req = new TransactionRequestBuilder().withOwnOutputNotes(new NoteArray([note])).build();
         const res = await execute({ accountId: signerRef, request: req });
-        setRealTx({ tx: res.transactionId, account: signerRef.toString() });
+        setRealTx({ tx: res.transactionId, account: signerRef.toString(), marketHex });
         window.txToast?.({
           kind: "tx",
           title: `${order.side} position sealed`,
-          desc: `Your ${order.side} bet of ${window.fmtUsd(order.amount)} is recorded on Miden as a private commitment — no side, size or owner is revealed on-chain.`,
+          desc: `Your ${order.side} bet of ${order.amount} OBX is recorded on Miden as a private commitment — no side, size or owner is revealed on-chain.`,
           tx: res.transactionId,
           account: signerRef.toString(),
         });
@@ -470,21 +475,20 @@ function App() {
       const o = seal.order;
       const pos = {
         id: "p-" + Math.random().toString(36).slice(2, 7),
-        marketId: o.market.id, side: o.side, size: o.amount,
+        marketId: o.market.id, marketAccount: realTx?.marketHex, side: o.side, size: o.amount,
         avg: Math.round(o.price), shares: o.shares, pnl: 0, value: o.amount,
-        commitment: realTx ? shortHex(realTx.tx) : "0x9f3a…e201",
+        commitment: realTx ? shortHex(realTx.tx) : "(submitting…)",
         tx: realTx?.tx, account: realTx?.account, revealed: false,
       };
       setPositions((ps) => [pos, ...ps]);
-      setBalance((b) => Math.max(0, b - o.amount));
     }
     setSeal(null);
     if (navigate) go("positions");
   };
 
   let screen;
-  if (route === "detail" && market) screen = <window.MarketDetail m={market} go={go} onPlace={place} balance={balance} liveMarkets={live} />;
-  else if (route === "positions") screen = <window.PositionsScreen positions={positions} balance={balance} go={go} live={live} onRedeem={redeem} />;
+  if (route === "detail" && market) screen = <window.MarketDetail m={market} go={go} onPlace={place} balance={liveBalance} liveMarkets={live} />;
+  else if (route === "positions") screen = <window.PositionsScreen positions={positions} balance={liveBalance} go={go} live={live} onRedeem={redeem} />;
   else if (route === "agents") screen = <window.AgentsScreen />;
   else screen = <window.MarketsHome onOpen={openMarket} liveMarkets={live} />;
 

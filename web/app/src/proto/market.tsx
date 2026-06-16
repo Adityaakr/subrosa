@@ -192,7 +192,7 @@ function ActivityFeed() {
           <window.Icon name="fingerprint" size={14} color="var(--faint)" />
           <span className="mono" style={{ fontSize: 12.5, color: "var(--faint)" }}>0x••••</span>
           <span className="tag" style={{ color: r.side === "YES" ? "var(--yes)" : "var(--no)" }}>{r.side === "YES" ? "▲ YES" : "▼ NO"}</span>
-          <span className="mono" style={{ fontSize: 12.5, color: "var(--faint)" }}>•••• USDC</span>
+          <span className="mono" style={{ fontSize: 12.5, color: "var(--faint)" }}>•••• OBX</span>
           <span className="mono" style={{ marginLeft: "auto", fontSize: 11.5, color: "var(--faint)" }}>{r.t}</span>
         </div>
       ))}
@@ -281,7 +281,7 @@ function BetPanel({ m, balance, onPlace }) {
   const roi = (profit / amt) * 100;
   const liq = parseAbb(m.liquidity);
   const impact = Math.min(9, (amt / liq) * 100 * 0.7);
-  const max = Math.min(2000, balance);
+  const max = Math.max(0, balance); // real spendable OBX balance
 
   if (m._resolution) return <ResolvedPanel m={m} resolution={m._resolution} />;
 
@@ -309,13 +309,13 @@ function BetPanel({ m, balance, onPlace }) {
       <div style={{ marginBottom: 10 }}>
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 7 }}>
           <span className="tag" style={{ color: "var(--muted)" }}>AMOUNT</span>
-          <span className="mono" style={{ fontSize: 11.5, color: "var(--faint)" }}>Balance {window.fmtUsd(balance)}</span>
+          <span className="mono" style={{ fontSize: 11.5, color: "var(--faint)" }}>Balance {balance.toLocaleString()} OBX</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, height: 50, padding: "0 14px", borderRadius: "var(--r-md)", border: "1px solid var(--hair-2)", background: "var(--bg)" }}>
           <window.Icon name="dollar-sign" size={17} color="var(--faint)" />
           <input value={amt} onChange={(e) => setAmt(Math.max(0, Math.min(max, parseInt(e.target.value.replace(/\D/g, "")) || 0)))}
             className="mono" style={{ flex: 1, minWidth: 0, border: "none", outline: "none", background: "transparent", color: "var(--text)", fontSize: 22, fontWeight: 500 }} />
-          <span className="mono" style={{ fontSize: 13, color: "var(--faint)" }}>USDC</span>
+          <span className="mono" style={{ fontSize: 13, color: "var(--faint)" }}>OBX</span>
         </div>
       </div>
 
