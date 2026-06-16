@@ -28,21 +28,28 @@ threshold is uniform (or per-procedure-root, not per-amount). So
 - peer: `@miden-sdk/miden-sdk@0.14.5` (exact pin the multisig client requires —
   do **not** float to 0.15.x)
 
-## Run it
+## Run it — real on-chain co-sign in 3 commands
 ```bash
-# 1. self-host Guardian
+# 1. self-host Guardian (non-custodial coordinator)
 git clone https://github.com/OpenZeppelin/guardian ../guardian
-cd agent && GUARDIAN_REPO=../guardian npm run guardian:up        # → :3000 / :50051
-curl http://localhost:3000/pubkey                                # guardian commitment
+cd agent && npm install
+GUARDIAN_REPO=../guardian npm run guardian:up        # → :3000 / :50051
+curl http://localhost:3000/pubkey                    # guardian commitment (liveness)
 
-# 2. one-time: create the 2-of-N agent+human multisig (see guardian.ts header)
-#    MultisigClient.create({ threshold: 2, signerCommitments:[agent,human],
-#                            guardianCommitment, guardianEnabled: true })
-#    export SUBROSA_MULTISIG=0x<that account id>
+# 2. ONE-COMMAND co-sign demo → a REAL on-chain multisig tx
+#    Creates a 2-of-2 (agent+human) Guardian multisig, proposes a trade,
+#    signs with BOTH local signers (you play both parties), and executes.
+npm run cosign
+#    → prints the multisig account id + "EXECUTED on-chain" — verify the
+#      account/tx on https://testnet.midenscan.com
 
-# 3. run the agent
-npm install && npm start            # or: npm start -- --once
+# 3. (optional) run the autonomous agent loop with the cap guardrail
+export SUBROSA_MULTISIG=0x<id printed in step 2>
+npm start                              # or: npm start -- --once
 ```
+`npm run cosign` (`src/cosign-demo.ts`) is the fastest path to a real Guardian
+co-sign hash. The agent loop (`npm start`) routes sub-cap trades to the
+autonomous path and above-cap trades to this same propose→co-sign→execute flow.
 
 ## Co-sign flow (verified API)
 `createP2idProposal(recipient, faucet, amount)` → agent `signProposal(id)` →

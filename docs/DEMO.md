@@ -37,6 +37,31 @@ bash scripts/lifecycle.sh <market_account_hex>
 # open -> place YES & NO -> resolve -> redeem winner -> redeem loser (aborts)
 ```
 
+## Connected loop: browser bet → operator → live odds (real, on-chain)
+The web app places a PRIVATE position (proved in-browser, commitment-only). You
+then run the **operator step** to settle the public odds on-chain:
+```bash
+scripts/operator.sh yes        # or: no    (MARKET=0x... to target another market)
+```
+Verified on-chain on the market the web app reads (`0x5ff0303f…480b`):
+| step | tx | effect |
+|---|---|---|
+| place YES 250 | `0x3e4c0c6e7278d6114bc397832af673d281576c61db9707d959e5b3fbccc4ebe2` | `yes_reserve` 1000 → 1250, vol → 250 |
+| place NO 100 | `0xf2a45615fcffe12dd4dce76701abb1b6680098ec598e518e948d82dce0d1c69a` | `no_reserve` 1000 → 1100, vol → 350 |
+
+Refresh the web app → the **live odds bar reflects the new reserves**. The
+position stays private (trader account = commitment only); the pool/odds are public.
+
+## Guardian co-sign (real on-chain multisig)
+Stand up self-hosted Guardian and run one command (see [`GUARDIAN.md`](./GUARDIAN.md)):
+```bash
+git clone https://github.com/OpenZeppelin/guardian ../guardian
+cd agent && npm install
+GUARDIAN_REPO=../guardian npm run guardian:up      # → :3000
+npm run cosign                                     # 2-of-2 propose → co-sign → execute
+```
+→ a real Guardian-coordinated multisig transaction, verifiable on the explorer.
+
 ---
 
 ## 90-second demo script

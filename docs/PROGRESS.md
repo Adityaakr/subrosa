@@ -207,10 +207,13 @@ succeed.
 live odds fetch, and the in-browser proving click-through. Run:
 `cd web/app && npm install && npm run dev` → http://localhost:5173.
 
-**DoD remaining:** confirm the in-browser place-position proving end-to-end in a
-browser, and wire the on-chain market `place` call from the local wallet (the
-read path + private-account proving are done; the custom-tx submit reuses the
-proven `scripts/place_*` pattern).
+**Connected loop (real, on-chain):** browser places a private position
+(commitment-only) → you run `scripts/operator.sh yes|no` to settle the public
+odds on-chain → refresh → the live odds bar moves. Verified on the web app's
+market `0x5ff0303f…480b`: place YES tx `0x3e4c0c6e…ebe2` (yes 1000→1250),
+place NO tx `0xf2a45615…c69a` (no 1000→1100). The web privacy seal shows the
+operator command. `place_note` mechanism (`contracts/notes/place_note`) is built
+for a future fully-in-browser network-operator path.
 ## Phase 4 — Confidential agent + Guardian co-sign  🟡 built, typechecks
 
 `agent/` (TypeScript) — an agent that trades from a private account with a
@@ -235,8 +238,12 @@ compiles against the real Guardian/SDK API surface.
 + a human co-signer for the above-cap path; the `FalconSigner`/`AuthSecretKey`
 constructor at runtime; the autonomous path against a funded agent account.
 
-**DoD remaining:** stand up Guardian + create the 2-of-N account + drive an
-above-cap trade through human co-sign to on-chain finalize.
+**One-command co-sign:** `agent` ships `npm run cosign` (`src/cosign-demo.ts`) —
+stand up self-hosted Guardian (`npm run guardian:up`), then `npm run cosign`
+creates a 2-of-2 multisig, proposes, signs with both parties, and **executes a
+real on-chain multisig tx** (verify on the explorer). Typechecks against the
+real OZ SDK; the live run needs the Guardian docker server (runbook in
+`GUARDIAN.md`).
 ## Phase 5 — Demo + tutorial  ✅ (Cusp LP layer ☐)
 
 The DevRel artifact — grounded entirely in verified, on-chain evidence:
