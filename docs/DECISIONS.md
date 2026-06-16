@@ -130,6 +130,29 @@ storage)`; `output_note::create`/`add_asset`; `create_fungible_asset`).
 payout note using a host-built recipient injected via advice inputs (the
 `basic-wallet-tx-script` pattern) so entitlement-check + payout are one tx.
 
+### D-014 · Adopt Guardian (self-hosted) for agent co-sign + recovery
+**Decided:** use OpenZeppelin Guardian, **self-hosted**, scoped to two jobs: the
+confidential agent's human co-sign above the cap (`@openzeppelin/miden-multisig-client`)
+and optional private-account backup/recovery (`@openzeppelin/guardian-client`).
+**Why:** the co-sign-above-cap guardrail IS a private threshold-signature
+workflow, which Guardian is purpose-built to coordinate; recovery solves the
+real "lose device → lose private positions" risk. **Self-hosted** because
+Guardian stores the payloads it receives — a third-party operator could observe
+positions, which would undercut the privacy claim. Guardian is non-custodial
+(coordinates/acks; never holds a key). It's WIP → keep the dependency thin,
+verify on bumps. See `docs/GUARDIAN.md`.
+
+### D-015 · Size cap is enforced app-side via a two-account model
+**Decided:** "autonomous ≤ cap / human co-sign > cap" is enforced in the agent,
+not in the Miden auth: a **1-of-1 agent account** for sub-cap autonomous trades
+and a **2-of-N agent+human Guardian multisig** for above-cap trades.
+**Why (verified):** Miden multisig has **no native size/amount-conditional
+threshold** — the on-chain k-of-n threshold is uniform (or per-procedure-root,
+not per-amount). So a value-gated rule cannot live in the auth component; the
+clean verified design is two accounts + app-side routing.
+**Versions:** pin `@miden-sdk/miden-sdk@0.14.5` (exact peer the multisig client
+requires); avoid 0.15.x.
+
 ## Pending decisions (need input — see PLAN.md open questions)
 - Testnet RPC endpoint (default vs current rotated URL).
 - Faucet authorization for test funds.
