@@ -24,6 +24,13 @@ const SLOT_NO = "miden_market::market::no_reserve";
 const SLOT_VOL = "miden_market::market::total_volume";
 const SLOT_RES = "miden_market::market::resolution";
 
+// Markets backed by a REAL on-chain account (read live). Keyed by the
+// window.OBS market id. Others render as "preview". Markets 2 & 3 are added
+// once their accounts are deployed + seeded.
+const LIVE_MARKETS = {
+  "miden-mainnet": MARKET_ID_HEX,
+};
+
 const wordToBig = (w) => { try { return w ? w.toU64s()[0] : 0n; } catch (e) { return 0n; } };
 
 // Read a market account's public state straight from the chain: reserves →
@@ -269,6 +276,31 @@ function useMidenFi() {
   };
 }
 
+/* Reads every registered live market's on-chain state on an interval (serially,
+   to respect the single WASM client) → { [marketId]: {yesPct, volume, ...} }. */
+function useLiveMarkets(client, isReady) {
+  const [live, setLive] = React.useState({});
+  React.useEffect(() => {
+    if (!isReady || !client) return;
+    let alive = true, inflight = false;
+    const tick = async () => {
+      if (inflight) return; inflight = true;
+      try {
+        const out = {};
+        for (const [mid, acctHex] of Object.entries(LIVE_MARKETS)) {
+          if (!acctHex) continue;
+          try { out[mid] = await readMarketState(client, acctHex); } catch (e) {}
+        }
+        if (alive && Object.keys(out).length) setLive((prev) => ({ ...prev, ...out }));
+      } finally { inflight = false; }
+    };
+    tick();
+    const iv = setInterval(tick, 15000);
+    return () => { alive = false; clearInterval(iv); };
+  }, [isReady, client]);
+  return live;
+}
+
 /* Subrosa prototype — root app: routing, state, seal flow.
    The seal UX is the design's; place() ALSO fires a REAL on-chain tx (private
    account + position note) and surfaces its hash in the seal + positions. */
@@ -290,6 +322,7 @@ function App() {
   React.useEffect(() => {
     if (isReady && client) window.__subrosaReadMarket = (hex) => readMarketState(client, hex || MARKET_ID_HEX);
   }, [isReady, client]);
+  const live = useLiveMarkets(client, isReady);
   const [mfFunding, setMfFunding] = React.useState(false);
   const [mfFundMsg, setMfFundMsg] = React.useState(null);
 
@@ -404,10 +437,10 @@ function App() {
   };
 
   let screen;
-  if (route === "detail" && market) screen = <window.MarketDetail m={market} go={go} onPlace={place} balance={balance} />;
+  if (route === "detail" && market) screen = <window.MarketDetail m={market} go={go} onPlace={place} balance={balance} liveMarkets={live} />;
   else if (route === "positions") screen = <window.PositionsScreen positions={positions} balance={balance} go={go} />;
   else if (route === "agents") screen = <window.AgentsScreen />;
-  else screen = <window.MarketsHome onOpen={openMarket} />;
+  else screen = <window.MarketsHome onOpen={openMarket} liveMarkets={live} />;
 
   const topLeft = route === "detail"
     ? <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13.5, color: "var(--faint)" }}>

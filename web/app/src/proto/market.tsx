@@ -10,6 +10,32 @@ function parseAbb(s) {
   return n;
 }
 
+const fmtUnits = (n) => (n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1) + "k" : String(Math.round(n)));
+
+// Overlay real on-chain state onto a market when it's backed by a live account
+// (window.LIVE_MARKETS). Odds/volume/liquidity become real; a `_live` flag
+// drives the LIVE badge. Other fields stay as display decoration for now.
+function withLive(m, live) {
+  const L = live && live[m.id];
+  if (!L) return m;
+  return {
+    ...m,
+    yes: Math.round(L.yesPct),
+    volume: fmtUnits(L.volume) + " OBX",
+    liquidity: fmtUnits(L.liquidity) + " OBX",
+    _live: true,
+    _resolution: L.resolution,
+  };
+}
+
+function LiveBadge() {
+  return (
+    <span className="mono" title="Odds & volume read live from the on-chain market account" style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 9.5, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--yes)", background: "var(--yes-dim)", padding: "2px 7px", borderRadius: 999 }}>
+      <span style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--yes)" }} /> Live
+    </span>
+  );
+}
+
 /* ---------- home grid tile ---------- */
 function MarketTile({ m, onOpen }) {
   const [h, setH] = uS(false);
@@ -19,10 +45,12 @@ function MarketTile({ m, onOpen }) {
       style={{ background: "var(--surface)", border: `1px solid ${h ? "var(--hair-2)" : "var(--hair)"}`, borderRadius: "var(--r)", padding: 18, cursor: "pointer", transition: "all 180ms cubic-bezier(0.22,1,0.36,1)", transform: h ? "translateY(-3px)" : "none", boxShadow: h ? "0 16px 36px rgba(12,12,14,0.10), 0 0 0 1px rgba(255,85,0,0.10)" : "0 1px 2px rgba(12,12,14,0.05)", display: "flex", flexDirection: "column", gap: 14, minHeight: 196 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <window.Cat name={m.category} />
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5 }} className="mono">
-          <window.Icon name={up ? "trending-up" : "trending-down"} size={13} color={up ? "var(--yes)" : "var(--no)"} />
-          <span style={{ color: up ? "var(--yes)" : "var(--no)" }}>{up ? "+" : ""}{m.change}%</span>
-        </span>
+        {m._live ? <LiveBadge /> : (
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5 }} className="mono">
+            <window.Icon name={up ? "trending-up" : "trending-down"} size={13} color={up ? "var(--yes)" : "var(--no)"} />
+            <span style={{ color: up ? "var(--yes)" : "var(--no)" }}>{up ? "+" : ""}{m.change}%</span>
+          </span>
+        )}
       </div>
       <h3 style={{ fontFamily: "var(--disp)", fontWeight: 500, fontSize: 16.5, lineHeight: 1.28, letterSpacing: "-0.01em", color: "var(--text)", margin: 0, minHeight: 42 }}>{m.question}</h3>
       <div style={{ marginTop: "auto" }}>
@@ -71,10 +99,11 @@ function HeroHalftone() {
 }
 
 /* ---------- markets home ---------- */
-function MarketsHome({ onOpen }) {
+function MarketsHome({ onOpen, liveMarkets }) {
   const cats = ["All", ...Array.from(new Set(window.OBS.markets.map((m) => m.category)))];
   const [f, setF] = uS("All");
-  const shown = f === "All" ? window.OBS.markets : window.OBS.markets.filter((m) => m.category === f);
+  const base = window.OBS.markets.map((m) => withLive(m, liveMarkets));
+  const shown = f === "All" ? base : base.filter((m) => m.category === f);
   return (
     <div className="scroll" style={{ overflowY: "auto", height: "100%" }}>
       <div style={{ maxWidth: 1160, margin: "0 auto", padding: "30px 28px 64px" }}>
@@ -253,7 +282,8 @@ function Row({ k, v, vc, big }) {
 }
 
 /* ---------- market detail ---------- */
-function MarketDetail({ m, go, onPlace, balance }) {
+function MarketDetail({ m: m0, go, onPlace, balance, liveMarkets }) {
+  const m = withLive(m0, liveMarkets);
   const [live, flash] = window.useLiveOdds(m.yes);
   const liveHist = uR(m.history.slice());
   const [, force] = uS(0);
