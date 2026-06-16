@@ -16,10 +16,20 @@ const coiHeaders = {
 
 export default defineConfig({
   plugins: [react(), midenVitePlugin({ crossOriginIsolation: false })],
-  server: { headers: coiHeaders },
+  server: {
+    headers: coiHeaders,
+    // Proxy the self-hosted Guardian (plain HTTP REST on :3000) so the browser
+    // reaches it same-origin (no CORS). guardianEndpoint = `${origin}/guardian`.
+    proxy: {
+      "/guardian": { target: "http://localhost:3000", changeOrigin: true, ws: false, rewrite: (p) => p.replace(/^\/guardian/, "") },
+    },
+  },
   preview: { headers: coiHeaders },
   resolve: {
-    dedupe: ["react", "react-dom", "react/jsx-runtime"],
+    // Dedupe @miden-sdk so the OZ multisig client and the app share ONE SDK
+    // instance (top-level 0.14.11) — otherwise the OZ client's nested 0.14.5
+    // loads a second Dexie/WASM and they collide ("two versions of Dexie").
+    dedupe: ["react", "react-dom", "react/jsx-runtime", "@miden-sdk/miden-sdk", "dexie"],
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
@@ -29,7 +39,7 @@ export default defineConfig({
   // worker fetches HTML instead of the .wasm). Excluding it lets the worker
   // load the real module/wasm directly.
   optimizeDeps: {
-    exclude: ["@miden-sdk/miden-sdk", "@miden-sdk/react"],
+    exclude: ["@miden-sdk/miden-sdk", "@miden-sdk/react", "@openzeppelin/miden-multisig-client"],
   },
   // Multi-page: landing at "/" (index.html), the React dapp at "/app/" (app/index.html).
   build: {
@@ -37,6 +47,7 @@ export default defineConfig({
       input: {
         main: path.resolve(__dirname, "index.html"),
         app: path.resolve(__dirname, "app/index.html"),
+        cosign: path.resolve(__dirname, "cosign.html"),
       },
     },
   },
