@@ -17,12 +17,18 @@ services:
   guardian:
     build:
       context: ${GUARDIAN_REPO:-../guardian}
+      args:
+        # postgres-backed storage; DATABASE_URL supplied at runtime (gitignored .env)
+        GUARDIAN_SERVER_FEATURES: postgres
     ports:
       - "3000:3000"
       - "50051:50051"
     environment:
       GUARDIAN_NETWORK_TYPE: MidenTestnet
       GUARDIAN_MAX_PENDING_PROPOSALS_PER_ACCOUNT: "20"
+      # value comes from the shell env (sourced from the gitignored ../.env) —
+      # never hard-coded here.
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL (see agent/.env)}
       RUST_LOG: info
     volumes:
       - guardian-storage:/var/guardian/storage

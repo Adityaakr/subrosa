@@ -15,7 +15,8 @@
   "dependencies": {
     "@miden-sdk/miden-sdk": "0.14.5",
     "@openzeppelin/guardian-client": "^0.14.9",
-    "@openzeppelin/miden-multisig-client": "^0.14.9"
+    "@openzeppelin/miden-multisig-client": "^0.14.9",
+    "undici": "^8.5.0"
   },
   "devDependencies": {
     "@types/node": "^24.6.0",

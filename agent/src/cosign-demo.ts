@@ -12,7 +12,14 @@
 import "fake-indexeddb/auto"; // browser IndexedDB API for the web SDK's store, in Node
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import { Agent, setGlobalDispatcher } from "undici";
 import { GUARDIAN_ENDPOINT, MIDEN_RPC } from "./config.js";
+
+// The Miden RPC + remote prover speak gRPC-web over HTTP/2. Node's fetch
+// defaults to HTTP/1.1 (→ "missing content-type header in gRPC response").
+// Enable HTTP/2 so the SDK's remote prove + submit work from Node — the same
+// transport the browser uses natively.
+setGlobalDispatcher(new Agent({ allowH2: true }));
 
 // --- file: fetch polyfill so the browser web SDK can load WASM in Node ---
 const _fetch = globalThis.fetch;
@@ -37,6 +44,8 @@ async function main(): Promise<void> {
   const { MidenClient, AuthSecretKey } = (await import("@miden-sdk/miden-sdk")) as Any;
   const { MultisigClient, FalconSigner } = (await import("@openzeppelin/miden-multisig-client")) as Any;
 
+  // Remote testnet prover over HTTP/2 (enabled above). Local proving overflows
+  // the 32-bit WASM heap; remote offloads it.
   const miden = await MidenClient.createTestnet();
   const agent = new FalconSigner(AuthSecretKey.rpoFalconWithRNG(undefined));
   const human = new FalconSigner(AuthSecretKey.rpoFalconWithRNG(undefined));
@@ -76,16 +85,27 @@ async function main(): Promise<void> {
   await asHuman.signProposal(proposal.id);
   console.log("human co-signed → threshold met ✓");
 
-  try {
-    await asHuman.executeProposal(proposal.id);
-    console.log(`EXECUTED on-chain ✓ — verify: https://testnet.midenscan.com/account/${accountId}`);
-  } catch (e) {
-    const msg = (e instanceof Error ? e.message : String(e)).split("\n")[0];
+  // Execute with retry — local proving is slow and the RPC submit can hit
+  // transient errors; try a few times before giving up.
+  let executed = false, lastErr = "";
+  for (let attempt = 1; attempt <= 4 && !executed; attempt++) {
+    try {
+      console.log(`executing (local prove + submit), attempt ${attempt}…`);
+      const res: Any = await asHuman.executeProposal(proposal.id);
+      const tx = res?.transactionId ?? res?.txId ?? res?.id ?? "";
+      console.log(`EXECUTED on-chain ✓ ${tx ? "tx " + tx : ""}`);
+      console.log(`verify: https://testnet.midenscan.com/account/${accountId}`);
+      executed = true;
+    } catch (e) {
+      lastErr = (e instanceof Error ? e.message : String(e)).split("\n")[0];
+      console.log(`  attempt ${attempt} failed: ${lastErr}`);
+      if (attempt < 4) await new Promise((r) => setTimeout(r, 4000));
+    }
+  }
+  if (!executed) {
     console.log("");
     console.log("[finalize] 2-of-2 collected against the LIVE Guardian; ready to submit.");
-    console.log("[finalize] Proof generation is browser-only in Node (remote prover = gRPC-web;");
-    console.log(`[finalize] local prover needs Web Workers). Detail: ${msg}`);
-    console.log("[finalize] Run this co-sign from a BROWSER to land the on-chain tx hash.");
+    console.log(`[finalize] execute still failing after retries: ${lastErr}`);
   }
 }
 
