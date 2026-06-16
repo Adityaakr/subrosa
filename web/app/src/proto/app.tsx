@@ -195,14 +195,15 @@ function useWallet() {
         try { return accountIdsEqual(a.assetId, fid); }
         catch (e) { return String(a.assetId || "").toLowerCase() === String(fid).toLowerCase(); }
       });
-      let claimed = false;
+      let claimed = false, claimTx = null;
       for (let i = 0; i < 12; i++) {
         await new Promise((res) => setTimeout(res, 2500));
         try { await wasmRetry(() => sync()); } catch (e) {}
         try { await notes.refetch?.(); } catch (e) {}
         const ids = (notesRef.current || []).filter(isOurs).map((s) => s.id).filter(Boolean);
         if (ids.length) {
-          await wasmRetry(() => consume({ accountId: id, notes: ids }));
+          const cres = await wasmRetry(() => consume({ accountId: id, notes: ids }));
+          claimTx = cres?.transactionId ?? null;
           claimed = true;
           break;
         }
@@ -210,10 +211,20 @@ function useWallet() {
       try { await q.refetch?.(); } catch (e) {}
       setFundMsg(claimed ? "Funded ✓" : "Minted — balance updates shortly");
       setTimeout(() => setFundMsg(null), 4000);
+      if (claimed) {
+        window.txToast?.({
+          kind: "fund",
+          title: "Wallet funded — 1,000 OBX",
+          desc: "Minted 1,000 test OBX from your in-browser faucet and claimed it into your wallet. Balance is now spendable on the markets.",
+          tx: claimTx,
+          account: id,
+        });
+      }
     } catch (e) {
       console.warn("[fund] failed:", e);
       setFundMsg("Funding failed — see console");
       setTimeout(() => setFundMsg(null), 5000);
+      window.txToast?.({ kind: "error", title: "Funding failed", desc: "Couldn't mint/claim test OBX. See console for details." });
     } finally { setFunding(false); }
   };
 
@@ -416,7 +427,17 @@ function App() {
         const req = new TransactionRequestBuilder().withOwnOutputNotes(new NoteArray([note])).build();
         const res = await execute({ accountId: signerRef, request: req });
         setRealTx({ tx: res.transactionId, account: signerRef.toString() });
-      } catch (e) { console.warn("[place] on-chain tx failed:", e); }
+        window.txToast?.({
+          kind: "tx",
+          title: `${order.side} position sealed`,
+          desc: `Your ${order.side} bet of ${window.fmtUsd(order.amount)} is recorded on Miden as a private commitment — no side, size or owner is revealed on-chain.`,
+          tx: res.transactionId,
+          account: signerRef.toString(),
+        });
+      } catch (e) {
+        console.warn("[place] on-chain tx failed:", e);
+        window.txToast?.({ kind: "error", title: "Position tx failed", desc: "The on-chain commitment couldn't be submitted. See console for details." });
+      }
     })();
   };
 
@@ -468,6 +489,7 @@ function App() {
           onClose={() => finalize(false)}
         />
       ) : null}
+      <window.ToastHost />
     </div>
   );
 }

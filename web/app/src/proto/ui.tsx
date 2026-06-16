@@ -263,4 +263,67 @@ function TopBar({ left, wallet }) {
   );
 }
 
-Object.assign(window, { fmtUsd, fmtPct, StatusTag, Chip, Btn, Sparkline, OddsBar, useLiveOdds, Cat, Sidebar, TopBar });
+/* ---------- transaction pop-up (toast) ---------- */
+// Any flow fires window.txToast({ kind, title, desc, tx, account }) when a tx
+// is signed/lands; ToastHost renders a clear card with what it did + a clickable
+// hash to the explorer.
+const EXPLORER = "https://testnet.midenscan.com";
+const shortTx = (s) => (s && s.length > 16 ? `${s.slice(0, 10)}…${s.slice(-6)}` : (s || ""));
+
+function txToast(detail) {
+  try { window.dispatchEvent(new CustomEvent("subrosa:tx", { detail: detail || {} })); } catch (e) {}
+}
+
+function TxCard({ t, onClose }) {
+  const ic = t.kind === "fund" ? "wallet" : t.kind === "cosign" ? "shield-check" : t.kind === "error" ? "x" : "shield-check";
+  const accent = t.kind === "error" ? "var(--no)" : "var(--accent)";
+  return (
+    <div style={{ width: 360, background: "var(--glass)", backdropFilter: "blur(18px)", border: "1px solid var(--hair-2)", borderRadius: "var(--r-md)", boxShadow: "0 24px 60px rgba(12,12,14,0.28)", padding: 16, animation: "fadeUp 0.28s cubic-bezier(0.22,1,0.36,1) both", position: "relative", overflow: "hidden" }}>
+      <span style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: accent }} />
+      <button onClick={onClose} style={{ position: "absolute", top: 12, right: 12, width: 24, height: 24, borderRadius: 6, border: "none", background: "transparent", color: "var(--faint)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <window.Icon name="x" size={14} />
+      </button>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 11 }}>
+        <span style={{ width: 34, height: 34, borderRadius: 9, background: t.kind === "error" ? "var(--no-dim)" : "var(--accent-dim)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
+          <window.Icon name={ic} size={18} color={accent} />
+        </span>
+        <div style={{ minWidth: 0, paddingRight: 14 }}>
+          <div style={{ fontFamily: "var(--disp)", fontWeight: 600, fontSize: 14.5, color: "var(--text)" }}>{t.title}</div>
+          {t.desc ? <div style={{ fontSize: 12.5, lineHeight: 1.5, color: "var(--muted)", marginTop: 3 }}>{t.desc}</div> : null}
+          {t.tx ? (
+            <a className="mono" href={`${EXPLORER}/tx/${t.tx}`} target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 5, marginTop: 9, fontSize: 11.5, color: "var(--accent)", textDecoration: "none", background: "var(--accent-dim)", border: "1px solid rgba(255,85,0,0.22)", borderRadius: 999, padding: "3px 9px" }}>
+              tx {shortTx(t.tx)} <window.Icon name="chevron-right" size={12} color="var(--accent)" /> explorer
+            </a>
+          ) : null}
+          {t.account ? (
+            <a className="mono" href={`${EXPLORER}/account/${t.account}`} target="_blank" rel="noreferrer" style={{ display: "block", marginTop: 6, fontSize: 11, color: "var(--faint)", textDecoration: "none" }}>
+              account {shortTx(t.account)} ↗
+            </a>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ToastHost() {
+  const [toasts, setToasts] = useState([]);
+  useEffect(() => {
+    const onTx = (e) => {
+      const t = { id: Math.random().toString(36).slice(2), kind: "tx", ...(e.detail || {}) };
+      setToasts((ts) => [...ts.slice(-3), t]);
+      const ms = t.duration ?? (t.kind === "error" ? 9000 : 11000);
+      setTimeout(() => setToasts((ts) => ts.filter((x) => x.id !== t.id)), ms);
+    };
+    window.addEventListener("subrosa:tx", onTx);
+    return () => window.removeEventListener("subrosa:tx", onTx);
+  }, []);
+  const close = (id) => setToasts((ts) => ts.filter((x) => x.id !== id));
+  return (
+    <div style={{ position: "fixed", right: 22, bottom: 22, zIndex: 200, display: "flex", flexDirection: "column", gap: 12 }}>
+      {toasts.map((t) => <TxCard key={t.id} t={t} onClose={() => close(t.id)} />)}
+    </div>
+  );
+}
+
+Object.assign(window, { fmtUsd, fmtPct, StatusTag, Chip, Btn, Sparkline, OddsBar, useLiveOdds, Cat, Sidebar, TopBar, ToastHost, txToast });
