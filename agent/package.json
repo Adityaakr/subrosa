@@ -10,7 +10,8 @@
     "cosign": "tsx src/cosign-demo.ts",
     "guardian:up": "docker compose -f docker/guardian-compose.yml up --build -d",
     "guardian:down": "docker compose -f docker/guardian-compose.yml down",
-    "fund-service": "tsx src/fund-service.ts"
+    "fund-service": "tsx src/fund-service.ts",
+    "redeem-service": "tsx src/redeem-service.ts"
   },
   "dependencies": {
     "@miden-sdk/miden-sdk": "0.14.5",

@@ -21,10 +21,11 @@ function SummaryCard({ label, value, sub, glow, valueColor }) {
   );
 }
 
-function PositionRow({ pos, last }) {
+function PositionRow({ pos, last, resolution, onRedeem }) {
   const m = window.OBS.markets.find((x) => x.id === pos.marketId) || { question: pos.question, category: "Markets" };
   const [revealed, setRevealed] = pS(pos.revealed);
   const win = pos.pnl >= 0;
+  const won = resolution && ((resolution === 1 && pos.side === "YES") || (resolution === 2 && pos.side === "NO"));
   return (
     <div style={{ display: "grid", gridTemplateColumns: "2.3fr 0.7fr 0.8fr 1fr 1fr 1.4fr", gap: 14, alignItems: "center", padding: "16px 20px", borderBottom: last ? "none" : "1px solid var(--hair)" }}>
       <div style={{ minWidth: 0 }}>
@@ -47,14 +48,28 @@ function PositionRow({ pos, last }) {
         <div className="mono" style={{ fontSize: 12, color: win ? "var(--yes)" : "var(--no)", marginTop: 2 }}>{win ? "+" : ""}{pos.pnl}%</div>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 9, justifySelf: "end" }}>
-        <span className="tag" style={{ color: "var(--faint)" }}>{revealed ? "PUBLIC" : "REVEAL"}</span>
-        <Toggle on={revealed} onClick={() => setRevealed((r) => !r)} color="var(--oracle)" />
+        {resolution ? (
+          pos.redeemed ? (
+            <span className="tag" style={{ color: "var(--yes)", background: "var(--yes-dim)", padding: "4px 10px", borderRadius: 999 }}>Redeemed ✓</span>
+          ) : won ? (
+            <button onClick={() => onRedeem && onRedeem(pos)} disabled={pos.redeeming} style={{ display: "flex", alignItems: "center", gap: 6, height: 30, padding: "0 13px", borderRadius: 999, border: "none", background: "var(--accent)", color: "#fff", fontWeight: 600, fontSize: 12.5, cursor: pos.redeeming ? "default" : "pointer", opacity: pos.redeeming ? 0.7 : 1 }}>
+              <window.Icon name="wallet" size={13} color="#fff" /> {pos.redeeming ? "Redeeming…" : "Redeem"}
+            </button>
+          ) : (
+            <span className="tag" title="Losing side — the contract rejects its redemption" style={{ color: "var(--no)", background: "var(--no-dim)", padding: "4px 10px", borderRadius: 999 }}>Lost</span>
+          )
+        ) : (
+          <>
+            <span className="tag" style={{ color: "var(--faint)" }}>{revealed ? "PUBLIC" : "REVEAL"}</span>
+            <Toggle on={revealed} onClick={() => setRevealed((r) => !r)} color="var(--oracle)" />
+          </>
+        )}
       </div>
     </div>
   );
 }
 
-function PositionsScreen({ positions, balance, go }) {
+function PositionsScreen({ positions, balance, go, live, onRedeem }) {
   const all = positions;
   const bookValue = all.reduce((s, p) => s + p.value, 0);
   const cost = all.reduce((s, p) => s + p.size, 0);
@@ -86,7 +101,7 @@ function PositionsScreen({ positions, balance, go }) {
               <span key={i} className="tag" style={{ color: "var(--faint)", justifySelf: i === 5 ? "end" : "start" }}>{h}</span>
             ))}
           </div>
-          {all.map((p, i) => <PositionRow key={p.id} pos={p} last={i === all.length - 1} />)}
+          {all.map((p, i) => <PositionRow key={p.id} pos={p} last={i === all.length - 1} resolution={(live && live[p.marketId] && live[p.marketId].resolution) || 0} onRedeem={onRedeem} />)}
           {all.length === 0 ? (
             <div style={{ padding: "48px 20px", textAlign: "center", color: "var(--faint)" }}>
               <window.Icon name="wallet" size={26} color="var(--faint)" style={{ margin: "0 auto 12px" }} />

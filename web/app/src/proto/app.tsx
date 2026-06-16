@@ -11,6 +11,7 @@ import { randomWord } from "../lib/miden";
 
 const MARKET_ID_HEX = "0x5ff0303f0b795d1039ca5b51d8480b";
 const OBX_FAUCET_HEX = "0x1201d9f8819d5220778535e4e2f08a";
+const REDEEM_ENDPOINT = import.meta.env.VITE_REDEEM_ENDPOINT ?? "http://localhost:8788/redeem";
 const WALLET_LS = "subrosa.wallet.id";
 // per-browser test-OBX faucet (web SDK). Versioned: bumping abandons faucets
 // created with old params (e.g. the pre-fix 1e9 maxSupply) so a correct one is
@@ -336,6 +337,7 @@ function App() {
     if (isReady && client) window.__subrosaReadMarket = (hex) => readMarketState(client, hex || MARKET_ID_HEX);
   }, [isReady, client]);
   const live = useLiveMarkets(client, isReady);
+  React.useEffect(() => { window.__subrosaLive = live; }, [live]);
   const [mfFunding, setMfFunding] = React.useState(false);
   const [mfFundMsg, setMfFundMsg] = React.useState(null);
 
@@ -405,6 +407,27 @@ function App() {
   const go = (r) => { if (r !== "detail") setMarket(null); setRoute(r); };
   const openMarket = (m) => { setMarket(m); setRoute("detail"); };
 
+  // Redeem a winning position on a resolved market. v1 settlement is resolver-
+  // run (operator redeem-service); the contract's redeem() guard only succeeds
+  // for the winning side, so losing redemptions are rejected on-chain.
+  const redeem = async (pos) => {
+    const market = LIVE_MARKETS[pos.marketId];
+    if (!market) { window.txToast?.({ kind: "error", title: "Not redeemable here", desc: "This market isn't backed by a live on-chain account." }); return; }
+    const side = String(pos.side || "").toLowerCase();
+    setPositions((ps) => ps.map((p) => (p.id === pos.id ? { ...p, redeeming: true } : p)));
+    window.txToast?.({ kind: "cosign", title: "Redeeming…", desc: `Settling your ${pos.side} position on-chain — the contract verifies you're on the winning side.` });
+    try {
+      const r = await fetch(REDEEM_ENDPOINT, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ market, side }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || `redeem ${r.status}`);
+      window.txToast?.({ kind: "tx", title: "Redeemed ✓", desc: `Your winning ${pos.side} position settled on-chain. 1:1 payout per share (v1).`, tx: j.tx, account: market });
+      setPositions((ps) => ps.map((p) => (p.id === pos.id ? { ...p, redeemed: true, redeeming: false } : p)));
+    } catch (e) {
+      window.txToast?.({ kind: "error", title: "Redemption rejected", desc: String(e?.message || e).includes("losing") ? "The contract rejected it — this is the losing side." : String(e?.message || e) });
+      setPositions((ps) => ps.map((p) => (p.id === pos.id ? { ...p, redeeming: false } : p)));
+    }
+  };
+
   const place = (order) => {
     committed.current = false;
     setRealTx(null);
@@ -461,7 +484,7 @@ function App() {
 
   let screen;
   if (route === "detail" && market) screen = <window.MarketDetail m={market} go={go} onPlace={place} balance={balance} liveMarkets={live} />;
-  else if (route === "positions") screen = <window.PositionsScreen positions={positions} balance={balance} go={go} />;
+  else if (route === "positions") screen = <window.PositionsScreen positions={positions} balance={balance} go={go} live={live} onRedeem={redeem} />;
   else if (route === "agents") screen = <window.AgentsScreen />;
   else screen = <window.MarketsHome onOpen={openMarket} liveMarkets={live} />;
 

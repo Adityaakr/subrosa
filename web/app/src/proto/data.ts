@@ -61,6 +61,10 @@
   const positions = [
     { id: "p-btc", marketId: "btc-ath", side: "NO", size: 80, avg: 61, shares: 131.1, pnl: +18.4, value: 98.4, commitment: "0x4a1c…b7e3", revealed: false },
     { id: "p-wc", marketId: "wc-final", side: "YES", size: 120, avg: 49, shares: 244.9, pnl: -6.2, value: 113.8, commitment: "0xc90f…21a8", revealed: false },
+    // On the resolved Fed market (YES won): a winning YES position (redeemable)
+    // and a losing NO position (the contract will reject its redemption).
+    { id: "p-fed-yes", marketId: "fed-sep", side: "YES", size: 200, avg: 45, shares: 444.4, pnl: +21.6, value: 243.2, commitment: "0x7b2e…44a1", revealed: false },
+    { id: "p-fed-no", marketId: "fed-sep", side: "NO", size: 90, avg: 55, shares: 163.6, pnl: -100, value: 0, commitment: "0x1c5d…90f2", revealed: false },
   ];
 
   const agents = [
