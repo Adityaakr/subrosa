@@ -200,6 +200,48 @@ function ActivityFeed() {
   );
 }
 
+// Real live trades: derive them from on-chain reserve deltas. When the live
+// poll shows yes/no_reserve increased, that increase IS a real trade (side +
+// amount). Public side/size, private owner — genuinely anonymized.
+function useReserveTrades(ls) {
+  const [trades, setTrades] = uS([]);
+  const prev = uR(null);
+  uE(() => {
+    if (!ls) return;
+    const p = prev.current;
+    if (p) {
+      const evs = [];
+      const dy = ls.yes - p.yes, dn = ls.no - p.no;
+      if (dy > 0) evs.push({ side: "YES", amt: dy, k: "y" + Date.now() });
+      if (dn > 0) evs.push({ side: "NO", amt: dn, k: "n" + Date.now() });
+      if (evs.length) setTrades((ts) => [...evs, ...ts].slice(0, 8));
+    }
+    prev.current = { yes: ls.yes, no: ls.no };
+  }, [ls && ls.yes, ls && ls.no]);
+  return trades;
+}
+
+function RealTrades({ trades, isLive }) {
+  if (!isLive) return <div className="mono" style={{ fontSize: 12.5, color: "var(--faint)", padding: "10px 4px" }}>Preview market — no on-chain account yet.</div>;
+  if (!trades.length) return (
+    <div className="mono" style={{ fontSize: 12.5, color: "var(--faint)", padding: "10px 4px", display: "flex", alignItems: "center", gap: 8 }}>
+      <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--yes)", animation: "blink 1.6s infinite" }} /> Watching the market account for trades…
+    </div>
+  );
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      {trades.map((r, i) => (
+        <div key={r.k} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 4px", borderBottom: i < trades.length - 1 ? "1px solid var(--hair)" : "none", animation: i === 0 ? "fadeUp 0.4s ease both" : "none" }}>
+          <window.Icon name="activity" size={14} color="var(--faint)" />
+          <span className="tag" style={{ color: r.side === "YES" ? "var(--yes)" : "var(--no)" }}>{r.side === "YES" ? "▲ YES" : "▼ NO"}</span>
+          <span className="mono" style={{ fontSize: 12.5, color: "var(--text)" }}>+{r.amt} OBX</span>
+          <span className="mono" style={{ marginLeft: "auto", fontSize: 11.5, color: "var(--faint)" }}>on-chain</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const RES_LABEL = { 1: "YES", 2: "NO" };
 
 /* Resolved market: betting closed; winners redeem from the Positions screen. */
@@ -318,6 +360,10 @@ function Row({ k, v, vc, big }) {
 /* ---------- market detail ---------- */
 function MarketDetail({ m: m0, go, onPlace, balance, liveMarkets }) {
   const m = withLive(m0, liveMarkets);
+  const isLive = !!m._live;
+  const ls = liveMarkets ? liveMarkets[m0.id] : null; // raw on-chain reserves
+  const resLabel = m._resolution === 1 ? "YES won" : m._resolution === 2 ? "NO won" : "Unresolved";
+  const trades = useReserveTrades(ls);
   const [live, flash] = window.useLiveOdds(m.yes);
   const liveHist = uR(m.history.slice());
   const [, force] = uS(0);
@@ -339,40 +385,46 @@ function MarketDetail({ m: m0, go, onPlace, balance, liveMarkets }) {
                 <window.Cat name={m.category} />
                 <window.StatusTag kind="public" />
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }} className="tag">
-                  <window.Icon name="radio" size={12} color="var(--oracle)" /><span style={{ color: "var(--oracle)" }}>{m.oracle.toUpperCase()}</span>
+                  <window.Icon name="radio" size={12} color={isLive ? "var(--yes)" : "var(--faint)"} />
+                  <span style={{ color: isLive ? "var(--yes)" : "var(--faint)" }}>{isLive ? "LIVE · MIDEN TESTNET" : "PREVIEW"}</span>
                 </span>
               </div>
               <h1 style={{ fontFamily: "var(--disp)", fontWeight: 700, fontSize: 30, letterSpacing: "-0.02em", color: "var(--text)", lineHeight: 1.12, margin: 0 }}>{m.question}</h1>
             </div>
 
-            {/* odds card */}
+            {/* odds card — real on-chain odds for live markets (no fake history) */}
             <div style={{ background: "var(--surface)", border: "1px solid var(--hair)", borderRadius: "var(--r)", padding: 22 }}>
               <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 16 }}>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <span className="tag" style={{ color: "var(--yes)" }}>YES</span>
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                      <span className="mono" style={{ fontSize: 40, fontWeight: 500, color: "var(--text)", letterSpacing: "-0.02em", transition: "color 200ms", textShadow: flash ? `0 0 18px ${flash > 0 ? "var(--yes)" : "var(--no)"}` : "none" }}>{window.fmtPct(live)}</span>
-                      <window.Icon name={flash >= 0 ? "trending-up" : "trending-down"} size={18} color={flash > 0 ? "var(--yes)" : flash < 0 ? "var(--no)" : "var(--faint)"} />
-                    </span>
+                    <span className="mono" style={{ fontSize: 40, fontWeight: 500, color: "var(--text)", letterSpacing: "-0.02em" }}>{window.fmtPct(isLive ? m.yes : live)}</span>
                   </div>
                   <div style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 6 }}>
-                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--yes)", animation: "blink 1.6s infinite" }} />
-                    <span className="mono" style={{ fontSize: 11.5, color: "var(--faint)" }}>updates live</span>
+                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: isLive ? "var(--yes)" : "var(--faint)", animation: isLive ? "blink 1.6s infinite" : "none" }} />
+                    <span className="mono" style={{ fontSize: 11.5, color: "var(--faint)" }}>{isLive ? "live from on-chain reserves" : "preview odds"}</span>
                   </div>
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  <div className="mono" style={{ fontSize: 13, color: up ? "var(--yes)" : "var(--no)" }}>{up ? "+" : ""}{m.change}% 24h</div>
-                  <div className="mono" style={{ fontSize: 12, color: "var(--faint)", marginTop: 4 }}>NO {window.fmtPct(100 - live)}</div>
+                  <div className="mono" style={{ fontSize: 12, color: "var(--faint)" }}>NO {window.fmtPct(100 - (isLive ? m.yes : live))}</div>
                 </div>
               </div>
-              <OddsChart data={liveHist.current} color="var(--yes)" />
-              <div style={{ marginTop: 14 }}><window.OddsBar yes={live} showLabels={false} height={8} /></div>
+              <window.OddsBar yes={isLive ? m.yes : live} showLabels={false} height={10} />
+              {isLive && ls ? (
+                <div className="mono" style={{ fontSize: 11, color: "var(--faint)", marginTop: 13, display: "flex", gap: 16 }}>
+                  <span>YES reserve <b style={{ color: "var(--text)" }}>{ls.yes.toLocaleString()}</b></span>
+                  <span>NO reserve <b style={{ color: "var(--text)" }}>{ls.no.toLocaleString()}</b></span>
+                  <span>OBX</span>
+                </div>
+              ) : null}
             </div>
 
-            {/* stats */}
+            {/* stats — real for live markets */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
-              {[["Volume", m.volume, "activity"], ["Liquidity", m.liquidity, "droplet"], ["Resolves", m.closes, "clock"], ["Traders", m.traders.toLocaleString(), "fingerprint"]].map(([k, v, ic]) => (
+              {(isLive
+                ? [["Volume", m.volume, "activity"], ["Liquidity", m.liquidity, "droplet"], ["Resolution", resLabel, "shield-check"], ["Source", "On-chain", "radio"]]
+                : [["Volume", m.volume, "activity"], ["Liquidity", m.liquidity, "droplet"], ["Resolves", m.closes, "clock"], ["Status", "Preview", "clock"]]
+              ).map(([k, v, ic]) => (
                 <div key={k} style={{ background: "var(--surface)", border: "1px solid var(--hair)", borderRadius: "var(--r-md)", padding: 14 }}>
                   <window.Icon name={ic} size={15} color="var(--faint)" />
                   <div className="mono" style={{ fontSize: 15, fontWeight: 500, color: "var(--text)", marginTop: 10 }}>{v}</div>
@@ -381,25 +433,24 @@ function MarketDetail({ m: m0, go, onPlace, balance, liveMarkets }) {
               ))}
             </div>
 
-            {/* two-up: resolution + activity */}
+            {/* two-up: resolution + live trades */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
               <div style={{ background: "var(--surface)", border: "1px solid var(--hair)", borderRadius: "var(--r)", padding: 18 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                  <window.Icon name="radio" size={15} color="var(--oracle)" />
-                  <span style={{ fontFamily: "var(--disp)", fontWeight: 700, fontSize: 15, color: "var(--text)" }}>Resolution</span>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <window.Icon name="shield-check" size={15} color="var(--accent)" />
+                    <span style={{ fontFamily: "var(--disp)", fontWeight: 700, fontSize: 15, color: "var(--text)" }}>Resolution</span>
+                  </div>
+                  <span className="tag" style={{ color: m._resolution ? (m._resolution === 1 ? "var(--yes)" : "var(--no)") : "var(--faint)", background: m._resolution ? (m._resolution === 1 ? "var(--yes-dim)" : "var(--no-dim)") : "transparent", padding: m._resolution ? "3px 8px" : 0, borderRadius: 999 }}>{resLabel}</span>
                 </div>
-                <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: "var(--muted)" }}>Settled by <b style={{ color: "var(--text)" }}>{m.oracle}</b> oracle on resolution date. Winners redeem privately against the market account.</p>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--hair)" }}>
-                  <window.Icon name="droplet" size={14} color="var(--accent)" />
-                  <span style={{ fontSize: 12.5, color: "var(--muted)" }}>Liquidity backstopped by <b style={{ color: "var(--text)" }}>Cusp</b> LPs.</span>
-                </div>
+                <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: "var(--muted)" }}>Settled on-chain by the <b style={{ color: "var(--text)" }}>resolver</b>: a designated key writes the outcome into the market account's public <span className="mono">resolution</span> slot. Winners redeem against the market; the contract rejects losing redemptions on-chain.</p>
               </div>
               <div style={{ background: "var(--surface)", border: "1px solid var(--hair)", borderRadius: "var(--r)", padding: 18 }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
                   <span style={{ fontFamily: "var(--disp)", fontWeight: 700, fontSize: 15, color: "var(--text)" }}>Live trades</span>
-                  <span className="tag" style={{ color: "var(--faint)" }}>ANONYMIZED</span>
+                  <span className="tag" style={{ color: "var(--faint)" }}>ON-CHAIN</span>
                 </div>
-                <ActivityFeed />
+                <RealTrades trades={trades} isLive={isLive} />
               </div>
             </div>
           </div>
