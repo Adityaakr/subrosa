@@ -11,4 +11,11 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  // Don't pre-bundle the Miden SDK: Vite's dep optimizer mishandles its
+  // web-worker + WASM loading in dev (stale "Outdated Optimize Dep" → the
+  // worker fetches HTML instead of the .wasm). Excluding it lets the worker
+  // load the real module/wasm directly.
+  optimizeDeps: {
+    exclude: ["@miden-sdk/miden-sdk", "@miden-sdk/react"],
+  },
 });
