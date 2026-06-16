@@ -26,15 +26,18 @@ function Scramble({ target, active, dur = 900 }) {
   return <span>{txt}</span>;
 }
 
-function RedactField({ label, value, sealing }) {
+// Shows the value → redaction wipe (sealing, dramatizing "hidden from chain") →
+// reveals the value again once `revealed` (done): it's YOUR data, only the chain
+// never sees it.
+function RedactField({ label, value, sealing, revealed }) {
+  const hidden = sealing && !revealed;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 5, flex: 1 }}>
       <span className="tag" style={{ color: "var(--faint)" }}>{label}</span>
       <div style={{ position: "relative", height: 24, overflow: "hidden" }}>
-        <span className="mono" style={{ fontSize: 16, fontWeight: 500, color: "var(--text)", transition: "opacity 200ms", opacity: sealing ? 0 : 1 }}>{value}</span>
-        {/* redaction bar wipe */}
-        <span style={{ position: "absolute", inset: 0, background: "var(--accent)", borderRadius: 4, transformOrigin: "left", transform: sealing ? "scaleX(1)" : "scaleX(0)", transition: "transform 480ms cubic-bezier(0.7,0,0.2,1)" }} />
-        <span className="mono" style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", fontSize: 15, color: "#fff", letterSpacing: 2, opacity: sealing ? 1 : 0, transition: "opacity 200ms 360ms" }}>••••••</span>
+        <span className="mono" style={{ fontSize: 16, fontWeight: 500, color: "var(--text)", transition: "opacity 200ms", opacity: hidden ? 0 : 1 }}>{value}</span>
+        <span style={{ position: "absolute", inset: 0, background: "var(--accent)", borderRadius: 4, transformOrigin: "left", transform: hidden ? "scaleX(1)" : "scaleX(0)", transition: "transform 480ms cubic-bezier(0.7,0,0.2,1)" }} />
+        <span className="mono" style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", fontSize: 15, color: "#fff", letterSpacing: 2, opacity: hidden ? 1 : 0, transition: "opacity 200ms 360ms" }}>••••••</span>
       </div>
     </div>
   );
@@ -101,18 +104,26 @@ function PrivacySeal({ order, publicYes, realTx, onView, onClose }) {
           </div>
         </div>
 
-        {/* ticket */}
+        {/* ticket — YOUR position (revealed to you once sealed) */}
         <div style={{ background: "var(--bg)", border: "1px solid var(--hair-2)", borderRadius: "var(--r-md)", padding: 16 }}>
-          <div style={{ display: "flex", gap: 16, marginBottom: 14 }}>
-            <RedactField label="SIDE" value={order.side} sealing={sealing} />
-            <RedactField label="SIZE" value={window.fmtUsd(order.amount)} sealing={sealing} />
-            <RedactField label="SHARES" value={order.shares.toFixed(1)} sealing={sealing} />
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            <span className="tag" style={{ color: "var(--faint)" }}>YOUR POSITION · VISIBLE ONLY TO YOU</span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10, color: "var(--accent)" }}><window.Icon name="eye-off" size={12} color="var(--accent)" /> PRIVATE</span>
           </div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 14, borderTop: "1px solid var(--hair)" }}>
-            <span className="tag" style={{ color: "var(--faint)" }}>ON-CHAIN COMMITMENT</span>
-            <span className="mono" style={{ fontSize: 13, color: sealing ? "var(--accent)" : "var(--faint)", fontWeight: 500 }}>
-              <Scramble target="0x9f3a…e201" active={phase === "committing" || phase === "done"} />
-            </span>
+          <div style={{ display: "flex", gap: 16, marginBottom: 14 }}>
+            <RedactField label="SIDE" value={order.side} sealing={sealing} revealed={phase === "done"} />
+            <RedactField label="SIZE" value={`${order.amount} OBX`} sealing={sealing} revealed={phase === "done"} />
+            <RedactField label="SHARES" value={order.shares.toFixed(1)} sealing={sealing} revealed={phase === "done"} />
+          </div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 14, borderTop: "1px solid var(--hair)", gap: 10 }}>
+            <span className="tag" style={{ color: "var(--faint)", whiteSpace: "nowrap" }}>ON-CHAIN TX · PUBLIC</span>
+            {realTx ? (
+              <a href={`https://testnet.midenscan.com/tx/${realTx.tx}`} target="_blank" rel="noreferrer" className="mono" style={{ fontSize: 12.5, color: "var(--accent)", fontWeight: 500, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 5, minWidth: 0 }}>
+                {realTx.tx.slice(0, 10)}…{realTx.tx.slice(-6)} <window.Icon name="chevron-right" size={12} color="var(--accent)" />
+              </a>
+            ) : (
+              <span className="mono" style={{ fontSize: 12.5, color: sealing ? "var(--accent)" : "var(--faint)" }}>writing commitment…</span>
+            )}
           </div>
         </div>
 
@@ -120,16 +131,11 @@ function PrivacySeal({ order, publicYes, realTx, onView, onClose }) {
         {phase === "done" ? (
           <div style={{ animation: "fadeUp 0.4s ease both" }}>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 9, margin: "16px 0", padding: "12px 14px", borderRadius: "var(--r-md)", background: "var(--accent-dim)", border: "1px solid rgba(255,85,0,0.25)" }}>
-              <window.Icon name="eye-off" size={15} color="var(--accent)" style={{ marginTop: 1 }} />
-              <span style={{ fontSize: 12.5, lineHeight: 1.5, color: "var(--muted)" }}>The network records <b style={{ color: "var(--text)" }}>only this commitment</b> — no owner, side, or size. Public odds keep moving.</span>
+              <window.Icon name="shield-check" size={15} color="var(--accent)" style={{ marginTop: 1 }} />
+              <span style={{ fontSize: 12.5, lineHeight: 1.5, color: "var(--muted)" }}>
+                <b style={{ color: "var(--text)" }}>Public proof, private position.</b> The transaction above is real and verifiable on the explorer — but it carries <b style={{ color: "var(--text)" }}>only a commitment</b>. Your side, size and identity are never written on-chain.
+              </span>
             </div>
-            {realTx ? (
-              <a href={`https://testnet.midenscan.com/tx/${realTx.tx}`} target="_blank" rel="noreferrer" className="mono" style={{ display: "block", margin: "-6px 0 12px", fontSize: 11.5, color: "var(--accent)", textDecoration: "none" }}>
-                real on-chain tx {realTx.tx.slice(0, 10)}… · view on explorer ↗
-              </a>
-            ) : (
-              <div className="mono" style={{ margin: "-6px 0 12px", fontSize: 11.5, color: "var(--faint)" }}>submitting on-chain…</div>
-            )}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 2px 16px" }}>
               <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
                 <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--yes)", animation: "blink 1.6s infinite" }} />
