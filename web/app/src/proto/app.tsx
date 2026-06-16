@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React from "react";
-import { useCreateWallet, useTransaction, useAccount, formatAssetAmount } from "@miden-sdk/react";
+import { useCreateWallet, useTransaction, useAccount, useConsume, useSyncState, useNotes, formatAssetAmount } from "@miden-sdk/react";
 import {
   AccountId, Package, NoteScript, Note, NoteAssets, NoteMetadata,
   NoteRecipient, NoteStorage, NoteTag, NoteType, NoteArray, FeltArray, TransactionRequestBuilder,
@@ -23,7 +23,13 @@ function useWallet() {
     try { return localStorage.getItem(WALLET_LS); } catch (e) { return null; }
   });
   const [connecting, setConnecting] = React.useState(false);
+  const [funding, setFunding] = React.useState(false);
   const acctRef = React.useRef(null);
+  const { consume } = useConsume();
+  const { sync } = useSyncState();
+  const notes = useNotes();
+  const notesRef = React.useRef([]);
+  React.useEffect(() => { notesRef.current = notes.consumableNotes || []; }, [notes.consumableNotes]);
   const q = useAccount(walletId ?? undefined);
   React.useEffect(() => { if (q.account) acctRef.current = q.account; }, [q.account]);
   // If a persisted id is no longer in the local store, reset rather than get
@@ -58,16 +64,32 @@ function useWallet() {
     try { localStorage.removeItem(WALLET_LS); } catch (e) {}
     setWalletId(null);
   };
+  // Ask the operator faucet to mint OBX to this wallet, then sync + consume the
+  // minted note so the live balance actually reflects the credit.
   const fund = async () => {
-    if (!walletId) return;
+    if (!walletId || funding) return;
+    setFunding(true);
     try {
-      await fetch(FUND_ENDPOINT, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ address: walletId }) });
-      setTimeout(() => q.refetch && q.refetch(), 1500);
-    } catch (e) { console.warn("[fund] failed — is the operator faucet service running?", e); }
+      const r = await fetch(FUND_ENDPOINT, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ address: walletId }) });
+      if (!r.ok) throw new Error("fund endpoint returned " + r.status);
+      for (let i = 0; i < 10; i++) {
+        await new Promise((res) => setTimeout(res, 3000));
+        try { await sync?.(); } catch (e) {}
+        try { await notes.refetch?.(); } catch (e) {}
+        const cn = notesRef.current || [];
+        if (cn.length) {
+          try { await consume({ accountId: walletId, notes: cn }); } catch (e) { console.warn("[fund] consume failed:", e); }
+          break;
+        }
+      }
+      try { await q.refetch?.(); } catch (e) {}
+    } catch (e) {
+      console.warn("[fund] failed — is the operator faucet service running on :8787?", e);
+    } finally { setFunding(false); }
   };
 
   return {
-    connected: !!walletId, connecting, walletId,
+    connected: !!walletId, connecting, funding, walletId,
     account: acctRef.current,
     balance, balanceLabel: formatAssetAmount(balance, 8),
     connect, disconnect, fund, refetch: q.refetch,

@@ -217,8 +217,8 @@ function TopBar({ left, wallet }) {
               <span className="mono" style={{ fontSize: 13, color: "var(--text)", fontWeight: 500 }}>{w.balanceLabel ?? "0"}</span>
               <span className="mono" style={{ fontSize: 11, color: "var(--faint)" }}>OBX</span>
             </div>
-            <button onClick={() => w.fund && w.fund()} title="Request test OBX from the faucet" style={{ display: "flex", alignItems: "center", gap: 6, height: 36, padding: "0 12px", borderRadius: "var(--r-md)", border: "1px solid var(--hair-2)", background: "var(--surface-2)", color: "var(--text)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>
-              <window.Icon name="plus" size={14} color="var(--accent)" /> Fund
+            <button onClick={() => w.fund && w.fund()} disabled={w.funding} title="Request test OBX from the faucet" style={{ display: "flex", alignItems: "center", gap: 6, height: 36, padding: "0 12px", borderRadius: "var(--r-md)", border: "1px solid var(--hair-2)", background: "var(--surface-2)", color: "var(--text)", fontSize: 13, fontWeight: 500, cursor: w.funding ? "default" : "pointer", opacity: w.funding ? 0.7 : 1 }}>
+              <window.Icon name="plus" size={14} color="var(--accent)" /> {w.funding ? "Funding…" : "Fund"}
             </button>
             <button onClick={() => w.disconnect && w.disconnect()} title="Disconnect" style={{ display: "flex", alignItems: "center", gap: 8, height: 36, padding: "0 10px 0 12px", borderRadius: "var(--r-md)", border: "1px solid var(--hair-2)", background: "var(--surface-2)", color: "var(--text)", cursor: "pointer" }}>
               <span style={{ width: 18, height: 18, borderRadius: "50%", background: "linear-gradient(135deg,#FF5500,#A300D6)" }} />
