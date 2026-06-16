@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React from "react";
-import { useCreateWallet, useTransaction, useAccount, useAccounts, useConsume, useSyncState, useNotes, formatAssetAmount, accountIdsEqual } from "@miden-sdk/react";
+import { useCreateWallet, useCreateFaucet, useMint, useTransaction, useAccount, useAccounts, useConsume, useSyncState, useNotes, formatAssetAmount, parseAssetAmount, accountIdsEqual } from "@miden-sdk/react";
 import { useWallet as useMidenFiAdapter } from "@miden-sdk/miden-wallet-adapter-react";
 import { WalletAdapterNetwork, PrivateDataPermission } from "@miden-sdk/miden-wallet-adapter-base";
 import {
@@ -11,8 +11,9 @@ import { randomWord } from "../lib/miden";
 
 const MARKET_ID_HEX = "0x5ff0303f0b795d1039ca5b51d8480b";
 const OBX_FAUCET_HEX = "0x1201d9f8819d5220778535e4e2f08a";
-const FUND_ENDPOINT = import.meta.env.VITE_FUND_ENDPOINT ?? "http://localhost:8787/fund";
 const WALLET_LS = "subrosa.wallet.id";
+const FAUCET_LS = "subrosa.faucet.id"; // per-browser test-OBX faucet (web SDK)
+const FUND_DECIMALS = 8;
 const shortHex = (s) => (s && s.length > 14 ? `${s.slice(0, 8)}…${s.slice(-4)}` : s);
 
 /* Real built-in browser wallet: a persisted private testnet account whose ID +
@@ -36,11 +37,17 @@ function useWallet() {
   // every wallet this client has in its local store
   const list = React.useMemo(() => [...(wallets || []), ...(accounts || [])].filter(Boolean), [wallets, accounts]);
 
+  const { createFaucet } = useCreateFaucet();
+  const { mint } = useMint();
   const [walletId, setWalletId] = React.useState(() => {
     try { return localStorage.getItem(WALLET_LS); } catch (e) { return null; }
   });
+  const [faucetId, setFaucetId] = React.useState(() => {
+    try { return localStorage.getItem(FAUCET_LS); } catch (e) { return null; }
+  });
   const [connecting, setConnecting] = React.useState(false);
   const [funding, setFunding] = React.useState(false);
+  const [fundMsg, setFundMsg] = React.useState(null);
   const [error, setError] = React.useState(null);
 
   // Resolve the connected account OBJECT from the store by its persisted id —
@@ -51,8 +58,10 @@ function useWallet() {
   const account = stored || acctRef.current;
 
   const q = useAccount(account ?? walletId ?? undefined);
+  // Balance is the wallet's holding of our per-browser test-OBX faucet (minted
+  // + consumed entirely via the web SDK, so it actually credits).
   let balance = 0n;
-  try { if (q.getBalance) balance = q.getBalance(OBX_FAUCET_HEX) ?? 0n; } catch (e) {}
+  try { if (q.getBalance && faucetId) balance = q.getBalance(faucetId) ?? 0n; } catch (e) {}
 
   // Once the store list has loaded, drop a persisted id that no longer exists
   // (e.g. the IndexedDB was reset) — but never wipe a freshly created wallet.
@@ -90,35 +99,55 @@ function useWallet() {
     setWalletId(null);
   };
 
-  // Ask the operator faucet to mint OBX to this wallet, then sync + consume the
-  // minted note so the live balance actually reflects the credit.
+  // Reuse the persisted test faucet if it's still in the store, else create one.
+  const ensureFaucet = async () => {
+    if (faucetId && list.find((a) => sameId(a, faucetId))) return faucetId;
+    setFundMsg("Creating test faucet…");
+    const f = await createFaucet({ tokenSymbol: "OBX", decimals: FUND_DECIMALS, maxSupply: 1_000_000_000n, storageMode: "public" });
+    const fid = idOf(f);
+    try { localStorage.setItem(FAUCET_LS, fid); } catch (e) {}
+    setFaucetId(fid);
+    return fid;
+  };
+
+  // Self-contained funding: mint test OBX from our own web-SDK faucet to the
+  // wallet, then consume the note. Same toolchain end-to-end → the consume's
+  // note script resolves (no cross-toolchain procedure mismatch).
   const fund = async () => {
     const id = address;
     if (!id || funding) return;
-    setFunding(true);
+    setFunding(true); setError(null);
     try {
-      const r = await fetch(FUND_ENDPOINT, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ address: id }) });
-      if (!r.ok) throw new Error("fund endpoint returned " + r.status);
-      for (let i = 0; i < 10; i++) {
-        await new Promise((res) => setTimeout(res, 3000));
+      const fid = await ensureFaucet();
+      setFundMsg("Minting 1,000 OBX…");
+      await mint({ targetAccountId: id, faucetId: fid, amount: parseAssetAmount("1000", FUND_DECIMALS), noteType: "private" });
+      setFundMsg("Claiming…");
+      let claimed = false;
+      for (let i = 0; i < 12; i++) {
+        await new Promise((res) => setTimeout(res, 2500));
         try { await sync?.(); } catch (e) {}
         try { await notes.refetch?.(); } catch (e) {}
         const ids = (notesRef.current || []).map((s) => s.id).filter(Boolean);
         if (ids.length) {
-          try { await consume({ accountId: id, notes: ids }); } catch (e) { console.warn("[fund] consume failed:", e); }
+          await consume({ accountId: id, notes: ids });
+          claimed = true;
           break;
         }
       }
       try { await q.refetch?.(); } catch (e) {}
+      setFundMsg(claimed ? "Funded ✓" : "Minted — balance updates shortly");
+      setTimeout(() => setFundMsg(null), 4000);
     } catch (e) {
-      console.warn("[fund] failed — is the operator faucet service running on :8787?", e);
+      console.warn("[fund] failed:", e);
+      setFundMsg("Funding failed — see console");
+      setTimeout(() => setFundMsg(null), 5000);
     } finally { setFunding(false); }
   };
 
   return {
-    connected: !!account || !!walletId, connecting, funding, error,
+    connected: !!account || !!walletId, connecting, funding, fundMsg, error,
     walletId: address, account,
-    balance, balanceLabel: formatAssetAmount(balance, 8),
+    balance, balanceLabel: formatAssetAmount(balance, FUND_DECIMALS),
     connect, disconnect, fund, refetch: q.refetch,
   };
 }
@@ -178,7 +207,7 @@ function App() {
   const wallet = {
     connected: !!kind, kind,
     connecting: builtin.connecting || mf.connecting,
-    funding: builtin.funding, error: builtin.error,
+    funding: builtin.funding, fundMsg: builtin.fundMsg, error: builtin.error,
     midenfiAvailable: mf.available,
     walletId: kind === "midenfi" ? mf.address : builtin.walletId,
     balanceLabel: kind === "midenfi" ? mf.balanceLabel : builtin.balanceLabel,
