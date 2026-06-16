@@ -4,7 +4,7 @@ import { useCreateWallet, useCreateFaucet, useMint, useTransaction, useAccount, 
 import { useWallet as useMidenFiAdapter } from "@miden-sdk/miden-wallet-adapter-react";
 import { WalletAdapterNetwork, PrivateDataPermission } from "@miden-sdk/miden-wallet-adapter-base";
 import {
-  AccountId, Package, NoteScript, Note, NoteAssets, NoteMetadata,
+  AccountId, Package, NoteScript, Note, NoteAssets, NoteMetadata, FungibleAsset,
   NoteRecipient, NoteStorage, NoteTag, NoteType, NoteArray, FeltArray, TransactionRequestBuilder,
 } from "@miden-sdk/miden-sdk";
 import { randomWord } from "../lib/miden";
@@ -35,6 +35,7 @@ const LIVE_MARKETS = {
 };
 
 const wordToBig = (w) => { try { return w ? w.toU64s()[0] : 0n; } catch (e) { return 0n; } };
+const toAccountId = (s) => { try { return String(s).startsWith("0x") ? AccountId.fromHex(s) : AccountId.fromBech32(s); } catch (e) { return AccountId.fromHex(s); } };
 
 // Read a market account's public state straight from the chain: reserves →
 // CPMM odds (YES% = no/(yes+no)), cumulative volume, and resolution.
@@ -451,14 +452,26 @@ function App() {
         const mid = AccountId.fromHex(marketHex);
         const rec = new NoteRecipient(randomWord(), ns, new NoteStorage(new FeltArray()));
         const meta = new NoteMetadata(senderId, NoteType.Private, NoteTag.withAccountTarget(mid));
-        const note = new Note(new NoteAssets(), meta, rec);
+        // STAKE the bet in OBX: the private note carries `amount` of the wallet's
+        // OBX, so placing actually debits your balance (a real collateralised
+        // position, not a zero-asset commitment).
+        const faucetHex = (() => { try { return localStorage.getItem(FAUCET_LS); } catch (e) { return null; } })();
+        let assets;
+        try {
+          assets = (faucetHex && order.amount > 0)
+            ? new NoteAssets([new FungibleAsset(toAccountId(faucetHex), parseAssetAmount(String(order.amount), FUND_DECIMALS))])
+            : new NoteAssets();
+        } catch (e) { assets = new NoteAssets(); }
+        const note = new Note(assets, meta, rec);
+        const noteId = (() => { try { return note.id().toString(); } catch (e) { return null; } })();
         const req = new TransactionRequestBuilder().withOwnOutputNotes(new NoteArray([note])).build();
         const res = await execute({ accountId: signerRef, request: req });
-        setRealTx({ tx: res.transactionId, account: signerRef.toString(), marketHex });
+        setRealTx({ tx: res.transactionId, account: signerRef.toString(), marketHex, noteId });
+        setTimeout(() => { try { builtin.refetch?.(); } catch (e) {} }, 2500); // reflect the lower balance
         window.txToast?.({
           kind: "tx",
-          title: `${order.side} position sealed`,
-          desc: `Your ${order.side} bet of ${order.amount} OBX is recorded on Miden as a private commitment — no side, size or owner is revealed on-chain.`,
+          title: `${order.side} position sealed · ${order.amount} OBX staked`,
+          desc: `Your ${order.side} stake of ${order.amount} OBX is locked into a private position note. The chain records only its commitment — side, size and owner stay private.`,
           tx: res.transactionId,
           account: signerRef.toString(),
         });
@@ -477,8 +490,8 @@ function App() {
         id: "p-" + Math.random().toString(36).slice(2, 7),
         marketId: o.market.id, marketAccount: realTx?.marketHex, side: o.side, size: o.amount,
         avg: Math.round(o.price), shares: o.shares, pnl: 0, value: o.amount,
-        commitment: realTx ? shortHex(realTx.tx) : "(submitting…)",
-        tx: realTx?.tx, account: realTx?.account, revealed: false,
+        commitment: realTx?.noteId ? shortHex(realTx.noteId) : (realTx ? shortHex(realTx.tx) : "(submitting…)"),
+        tx: realTx?.tx, noteId: realTx?.noteId, account: realTx?.account, revealed: false,
       };
       setPositions((ps) => [pos, ...ps]);
     }
