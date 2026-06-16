@@ -207,15 +207,17 @@ function useMidenFi() {
   const [balance, setBalance] = React.useState(0n);
   const [tick, setTick] = React.useState(0);
   const refreshAssets = React.useCallback(async () => {
-    if (!a.connected || !a.requestAssets) { setBalance(0n); return; }
+    if (!a.connected || !a.requestAssets) { setBalance(0n); return 0n; }
     let fid = null; try { fid = localStorage.getItem(FAUCET_LS); } catch (e) {}
     try {
       const assets = await a.requestAssets();
       const list = Array.isArray(assets) ? assets : (assets?.assets || []);
-      // match our per-browser test-OBX faucet; if none yet, fall back to first asset
+      console.log("[midenfi] assets:", JSON.stringify(list), "| our faucet:", fid);
       const match = (fid && list.find((x) => sameFaucet(x.faucetId ?? x.assetId, fid))) || null;
-      setBalance(match ? BigInt(match.amount ?? match.balance ?? 0) : 0n);
-    } catch (e) {}
+      const v = match ? BigInt(match.amount ?? match.balance ?? 0) : 0n;
+      setBalance(v);
+      return v;
+    } catch (e) { return 0n; }
   }, [a.connected]);
   React.useEffect(() => { refreshAssets(); }, [a.connected, tick, refreshAssets]);
 
@@ -276,9 +278,21 @@ function App() {
           done = true; break;
         }
       }
-      await mf.refreshAssets?.();
-      setMfFundMsg(done ? "Funded ✓" : "Minted — claim it in your Miden Wallet");
-      setTimeout(() => setMfFundMsg(null), 6000);
+      // The extension's consume settles asynchronously — poll requestAssets
+      // until the balance reflects it.
+      let credited = false;
+      if (done) {
+        setMfFundMsg("Confirming…");
+        for (let j = 0; j < 20; j++) {
+          await new Promise((r) => setTimeout(r, 3000));
+          const b = await mf.refreshAssets?.();
+          if (b && b > 0n) { credited = true; break; }
+        }
+      } else {
+        await mf.refreshAssets?.();
+      }
+      setMfFundMsg(credited ? "Funded ✓" : done ? "Claimed — balance may take a moment" : "Minted — claim it in your Miden Wallet");
+      setTimeout(() => setMfFundMsg(null), 7000);
     } catch (e) {
       console.warn("[fund:midenfi] failed:", e);
       setMfFundMsg("Funding failed — see console");
