@@ -1,7 +1,9 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { MidenProvider } from "@miden-sdk/react";
-import { MIDEN_RPC_URL, MIDEN_PROVER } from "./config";
+import { MidenFiSignerProvider } from "@miden-sdk/miden-wallet-adapter-react";
+import { WalletAdapterNetwork } from "@miden-sdk/miden-wallet-adapter-base";
+import { MIDEN_RPC_URL, MIDEN_PROVER, APP_NAME } from "./config";
 import "./proto/proto.css";
 
 // Load the prototype modules in order so their window.* exports are populated
@@ -20,12 +22,14 @@ const midenConfig = { rpcUrl: MIDEN_RPC_URL, prover: MIDEN_PROVER };
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <MidenProvider
-      config={midenConfig}
-      loadingComponent={<div className="backdrop" />}
-    >
-      <div className="backdrop" />
-      <App />
-    </MidenProvider>
+    <MidenFiSignerProvider appName={APP_NAME} network={WalletAdapterNetwork.Testnet} autoConnect={false}>
+      <MidenProvider
+        config={midenConfig}
+        loadingComponent={<div className="backdrop" />}
+      >
+        <div className="backdrop" />
+        <App />
+      </MidenProvider>
+    </MidenFiSignerProvider>
   </StrictMode>,
 );

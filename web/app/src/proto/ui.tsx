@@ -193,8 +193,34 @@ function ThemeToggle() {
 /* ---------- top bar ---------- */
 function shortId(s) { return s && s.length > 12 ? `${s.slice(0, 6)}…${s.slice(-4)}` : (s || ""); }
 
+function WalletChooser({ w, onClose }) {
+  return (
+    <>
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+      <div style={{ position: "absolute", top: 44, right: 0, width: 280, zIndex: 41, background: "var(--surface)", border: "1px solid var(--hair-2)", borderRadius: "var(--r-md)", boxShadow: "0 20px 50px rgba(12,12,14,0.22)", padding: 8, animation: "fadeUp 0.18s ease both" }}>
+        <div className="tag" style={{ color: "var(--faint)", padding: "8px 10px 6px" }}>Connect a wallet</div>
+        <button onClick={() => { onClose(); w.connectBuiltin && w.connectBuiltin(); }} style={{ display: "flex", alignItems: "center", gap: 11, width: "100%", textAlign: "left", padding: "10px 10px", borderRadius: "var(--r-sm)", border: "none", background: "transparent", cursor: "pointer", color: "var(--text)" }} onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-2)")} onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+          <span style={{ width: 30, height: 30, borderRadius: 8, background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}><window.Icon name="wallet" size={16} color="#fff" /></span>
+          <span style={{ minWidth: 0 }}>
+            <span style={{ display: "block", fontSize: 13.5, fontWeight: 600 }}>Subrosa Wallet</span>
+            <span style={{ display: "block", fontSize: 11.5, color: "var(--faint)" }}>Built-in · no extension needed</span>
+          </span>
+        </button>
+        <button onClick={() => { onClose(); w.connectMidenFi && w.connectMidenFi(); }} disabled={!w.midenfiAvailable} title={w.midenfiAvailable ? "" : "Miden Wallet extension not detected"} style={{ display: "flex", alignItems: "center", gap: 11, width: "100%", textAlign: "left", padding: "10px 10px", borderRadius: "var(--r-sm)", border: "none", background: "transparent", cursor: w.midenfiAvailable ? "pointer" : "not-allowed", opacity: w.midenfiAvailable ? 1 : 0.5, color: "var(--text)" }} onMouseEnter={(e) => { if (w.midenfiAvailable) e.currentTarget.style.background = "var(--bg-2)"; }} onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+          <span style={{ width: 30, height: 30, borderRadius: 8, background: "#0C0C0E", display: "flex", alignItems: "center", justifyContent: "center", flex: "none", fontFamily: "var(--disp)", fontWeight: 700, color: "var(--accent)", fontSize: 17 }}>m</span>
+          <span style={{ minWidth: 0 }}>
+            <span style={{ display: "block", fontSize: 13.5, fontWeight: 600 }}>Miden Wallet</span>
+            <span style={{ display: "block", fontSize: 11.5, color: "var(--faint)" }}>{w.midenfiAvailable ? "Browser extension" : "Not detected"}</span>
+          </span>
+        </button>
+      </div>
+    </>
+  );
+}
+
 function TopBar({ left, wallet }) {
   const w = wallet || {};
+  const [chooserOpen, setChooserOpen] = React.useState(false);
   return (
     <header style={{ position: "sticky", top: 0, zIndex: 5, display: "flex", alignItems: "center", gap: 16, height: 60, padding: "0 28px", borderBottom: "1px solid var(--hair)", background: "var(--glass)", backdropFilter: "blur(14px)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>{left}</div>
@@ -206,13 +232,14 @@ function TopBar({ left, wallet }) {
           <span className="mono" style={{ marginLeft: "auto", fontSize: 10.5, color: "var(--faint)", border: "1px solid var(--hair-2)", borderRadius: 5, padding: "1px 5px" }}>/</span>
         </div>
         {!w.connected ? (
-          <>
-            {w.error ? <span className="mono" title={w.error} style={{ fontSize: 11, color: "var(--no)", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{w.error}</span> : null}
-            <button onClick={() => w.connect && w.connect()} disabled={w.connecting} style={{ display: "flex", alignItems: "center", gap: 8, height: 36, padding: "0 16px", borderRadius: "var(--r-md)", border: "none", background: "var(--accent)", color: "#fff", fontWeight: 600, fontSize: 13.5, cursor: w.connecting ? "default" : "pointer", opacity: w.connecting ? 0.7 : 1 }}>
+          <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 10 }}>
+            {w.error ? <span className="mono" title={w.error} style={{ fontSize: 11, color: "var(--no)", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{w.error}</span> : null}
+            <button onClick={() => !w.connecting && setChooserOpen((o) => !o)} disabled={w.connecting} style={{ display: "flex", alignItems: "center", gap: 8, height: 36, padding: "0 16px", borderRadius: "var(--r-md)", border: "none", background: "var(--accent)", color: "#fff", fontWeight: 600, fontSize: 13.5, cursor: w.connecting ? "default" : "pointer", opacity: w.connecting ? 0.7 : 1 }}>
               <window.Icon name="wallet" size={15} color="#fff" />
               {w.connecting ? "Connecting…" : "Connect wallet"}
             </button>
-          </>
+            {chooserOpen ? <WalletChooser w={w} onClose={() => setChooserOpen(false)} /> : null}
+          </div>
         ) : (
           <>
             <div title="Live OBX balance on testnet" style={{ display: "flex", alignItems: "center", gap: 8, height: 36, padding: "0 12px", borderRadius: "var(--r-md)", border: "1px solid var(--hair)", background: "var(--surface)" }}>
@@ -220,11 +247,13 @@ function TopBar({ left, wallet }) {
               <span className="mono" style={{ fontSize: 13, color: "var(--text)", fontWeight: 500 }}>{w.balanceLabel ?? "0"}</span>
               <span className="mono" style={{ fontSize: 11, color: "var(--faint)" }}>OBX</span>
             </div>
-            <button onClick={() => w.fund && w.fund()} disabled={w.funding} title="Request test OBX from the faucet" style={{ display: "flex", alignItems: "center", gap: 6, height: 36, padding: "0 12px", borderRadius: "var(--r-md)", border: "1px solid var(--hair-2)", background: "var(--surface-2)", color: "var(--text)", fontSize: 13, fontWeight: 500, cursor: w.funding ? "default" : "pointer", opacity: w.funding ? 0.7 : 1 }}>
-              <window.Icon name="plus" size={14} color="var(--accent)" /> {w.funding ? "Funding…" : "Fund"}
-            </button>
-            <button onClick={() => w.disconnect && w.disconnect()} title="Disconnect" style={{ display: "flex", alignItems: "center", gap: 8, height: 36, padding: "0 10px 0 12px", borderRadius: "var(--r-md)", border: "1px solid var(--hair-2)", background: "var(--surface-2)", color: "var(--text)", cursor: "pointer" }}>
-              <span style={{ width: 18, height: 18, borderRadius: "50%", background: "linear-gradient(135deg,#FF5500,#A300D6)" }} />
+            {w.kind === "builtin" ? (
+              <button onClick={() => w.fund && w.fund()} disabled={w.funding} title="Request test OBX from the faucet" style={{ display: "flex", alignItems: "center", gap: 6, height: 36, padding: "0 12px", borderRadius: "var(--r-md)", border: "1px solid var(--hair-2)", background: "var(--surface-2)", color: "var(--text)", fontSize: 13, fontWeight: 500, cursor: w.funding ? "default" : "pointer", opacity: w.funding ? 0.7 : 1 }}>
+                <window.Icon name="plus" size={14} color="var(--accent)" /> {w.funding ? "Funding…" : "Fund"}
+              </button>
+            ) : null}
+            <button onClick={() => w.disconnect && w.disconnect()} title={`${w.kind === "midenfi" ? "Miden Wallet" : "Subrosa Wallet"} — click to disconnect`} style={{ display: "flex", alignItems: "center", gap: 8, height: 36, padding: "0 10px 0 12px", borderRadius: "var(--r-md)", border: "1px solid var(--hair-2)", background: "var(--surface-2)", color: "var(--text)", cursor: "pointer" }}>
+              <span style={{ width: 18, height: 18, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", flex: "none", background: w.kind === "midenfi" ? "#0C0C0E" : "linear-gradient(135deg,#FF5500,#A300D6)", fontFamily: "var(--disp)", fontWeight: 700, color: "var(--accent)", fontSize: 11 }}>{w.kind === "midenfi" ? "m" : ""}</span>
               <span className="mono" style={{ fontSize: 12.5 }}>{shortId(w.walletId)}</span>
               <window.Icon name="chevron-down" size={14} color="var(--faint)" />
             </button>

@@ -1,6 +1,8 @@
 // @ts-nocheck
 import React from "react";
 import { useCreateWallet, useTransaction, useAccount, useAccounts, useConsume, useSyncState, useNotes, formatAssetAmount, accountIdsEqual } from "@miden-sdk/react";
+import { useWallet as useMidenFiAdapter } from "@miden-sdk/miden-wallet-adapter-react";
+import { WalletAdapterNetwork, PrivateDataPermission } from "@miden-sdk/miden-wallet-adapter-base";
 import {
   AccountId, Package, NoteScript, Note, NoteAssets, NoteMetadata,
   NoteRecipient, NoteStorage, NoteTag, NoteType, NoteArray, FeltArray, TransactionRequestBuilder,
@@ -119,6 +121,40 @@ function useWallet() {
   };
 }
 
+/* External MidenFi ("Miden Wallet") extension via the wallet-adapter. select()
+   the injected adapter, then connect() prompts the extension. Balance is read
+   from the wallet's own assets. */
+function useMidenFi() {
+  const a = useMidenFiAdapter();
+  const [balance, setBalance] = React.useState(0n);
+  React.useEffect(() => {
+    let live = true;
+    if (a.connected && a.requestAssets) {
+      a.requestAssets().then((assets) => {
+        if (!live) return;
+        const list = Array.isArray(assets) ? assets : (assets?.assets || []);
+        const match = list.find((x) => String(x.faucetId ?? x.assetId ?? x.faucet ?? "").toLowerCase().includes(OBX_FAUCET_HEX.slice(2, 10)));
+        try { setBalance(match ? BigInt(match.amount ?? match.balance ?? 0) : 0n); } catch (e) { setBalance(0n); }
+      }).catch(() => {});
+    } else if (!a.connected) setBalance(0n);
+    return () => { live = false; };
+  }, [a.connected]);
+
+  const connect = async () => {
+    const w = a.wallets && a.wallets[0];
+    if (!w) throw new Error("Miden Wallet extension not detected");
+    a.select(w.adapter.name);
+    await new Promise((r) => setTimeout(r, 60));
+    await a.connect(PrivateDataPermission.UponRequest, WalletAdapterNetwork.Testnet);
+  };
+  return {
+    available: (a.wallets && a.wallets.length > 0) || false,
+    connected: a.connected, connecting: a.connecting,
+    address: a.address, balance, balanceLabel: formatAssetAmount(balance, 8),
+    connect, disconnect: a.disconnect,
+  };
+}
+
 /* Subrosa prototype — root app: routing, state, seal flow.
    The seal UX is the design's; place() ALSO fires a REAL on-chain tx (private
    account + position note) and surfaces its hash in the seal + positions. */
@@ -130,8 +166,25 @@ function App() {
   const [seal, setSeal] = React.useState(null); // {order}
   const [realTx, setRealTx] = React.useState(null); // {tx, account}
   const committed = React.useRef(false);
-  const wallet = useWallet();
+  const builtin = useWallet();
+  const mf = useMidenFi();
   const { execute } = useTransaction();
+
+  // Unified wallet model for the UI. MidenFi takes precedence when connected;
+  // otherwise the built-in browser wallet.
+  const kind = mf.connected ? "midenfi" : (builtin.connected ? "builtin" : null);
+  const wallet = {
+    connected: !!kind, kind,
+    connecting: builtin.connecting || mf.connecting,
+    funding: builtin.funding, error: builtin.error,
+    midenfiAvailable: mf.available,
+    walletId: kind === "midenfi" ? mf.address : builtin.walletId,
+    balanceLabel: kind === "midenfi" ? mf.balanceLabel : builtin.balanceLabel,
+    connectBuiltin: builtin.connect,
+    connectMidenFi: mf.connect,
+    disconnect: () => (kind === "midenfi" ? mf.disconnect() : builtin.disconnect()),
+    fund: builtin.fund, // faucet credits the built-in wallet
+  };
 
   const go = (r) => { if (r !== "detail") setMarket(null); setRoute(r); };
   const openMarket = (m) => { setMarket(m); setRoute("detail"); };
@@ -141,20 +194,30 @@ function App() {
     setRealTx(null);
     setSeal({ order });
     // Real on-chain tx in parallel (private account + position note). The seal
-    // animation plays regardless; the real hash appears when it lands.
+    // animation plays regardless; the real hash appears when it lands. Signs
+    // from whichever wallet is active (MidenFi via the bridged signer, else the
+    // built-in private account).
     (async () => {
       try {
-        const acct = await wallet.connect();
+        let signerRef, senderId;
+        if (mf.connected && mf.address) {
+          signerRef = mf.address;
+          senderId = AccountId.fromHex(mf.address);
+        } else {
+          const acct = await builtin.connect();
+          signerRef = acct.id();
+          senderId = acct.id();
+        }
         const masp = order.side === "YES" ? "/packages/place_note.masp" : "/packages/place_no_note.masp";
         const buf = await fetch(masp).then((r) => r.arrayBuffer());
         const ns = NoteScript.fromPackage(Package.deserialize(new Uint8Array(buf)));
         const mid = AccountId.fromHex(MARKET_ID_HEX);
         const rec = new NoteRecipient(randomWord(), ns, new NoteStorage(new FeltArray()));
-        const meta = new NoteMetadata(acct.id(), NoteType.Private, NoteTag.withAccountTarget(mid));
+        const meta = new NoteMetadata(senderId, NoteType.Private, NoteTag.withAccountTarget(mid));
         const note = new Note(new NoteAssets(), meta, rec);
         const req = new TransactionRequestBuilder().withOwnOutputNotes(new NoteArray([note])).build();
-        const res = await execute({ accountId: acct.id(), request: req });
-        setRealTx({ tx: res.transactionId, account: acct.id().toString() });
+        const res = await execute({ accountId: signerRef, request: req });
+        setRealTx({ tx: res.transactionId, account: signerRef.toString() });
       } catch (e) { console.warn("[place] on-chain tx failed:", e); }
     })();
   };
