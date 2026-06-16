@@ -8,6 +8,7 @@ import {
   NoteRecipient, NoteStorage, NoteTag, NoteType, NoteArray, FeltArray, TransactionRequestBuilder,
 } from "@miden-sdk/miden-sdk";
 import { randomWord } from "../lib/miden";
+import { guardianCoSign } from "../cosign";
 
 const MARKET_ID_HEX = "0x5ff0303f0b795d1039ca5b51d8480b";
 const OBX_FAUCET_HEX = "0x1201d9f8819d5220778535e4e2f08a";
@@ -433,11 +434,24 @@ function App() {
   const place = (order) => {
     committed.current = false;
     setRealTx(null);
-    setSeal({ order });
-    // Real on-chain tx in parallel. Positions are always placed from the
-    // built-in PRIVATE account (on-theme: the chain only sees a commitment),
-    // regardless of which wallet is shown for identity/balance.
+    // Positions are placed from the built-in PRIVATE account (the chain sees
+    // only a commitment). If "Protect with Guardian" is on, a real 2-of-N
+    // Guardian co-sign must complete first — then the staked bet is sealed.
     (async () => {
+      let coSignMultisig = null;
+      if (order.protect) {
+        window.txToast?.({ kind: "cosign", title: "Guardian co-signing… (2-of-N)", desc: "Collecting a Guardian co-sign before your bet lands — this takes ~1–2 min." });
+        try {
+          const r = await guardianCoSign((m) => console.log("[cosign]", m));
+          coSignMultisig = r.multisig;
+          window.txToast?.({ kind: "cosign", title: "Guardian co-signed ✓", desc: `2-of-N approved (multisig ${shortHex(coSignMultisig)}). Sealing your position…`, account: coSignMultisig });
+        } catch (e) {
+          console.warn("[cosign] failed:", e);
+          window.txToast?.({ kind: "error", title: "Guardian co-sign failed", desc: "Position not placed. Is the Guardian server running (npm run guardian:up)?" });
+          return;
+        }
+      }
+      setSeal({ order });
       try {
         const acct = await builtin.connect();
         const signerRef = acct.id();
@@ -466,12 +480,12 @@ function App() {
         const noteId = (() => { try { return note.id().toString(); } catch (e) { return null; } })();
         const req = new TransactionRequestBuilder().withOwnOutputNotes(new NoteArray([note])).build();
         const res = await execute({ accountId: signerRef, request: req });
-        setRealTx({ tx: res.transactionId, account: signerRef.toString(), marketHex, noteId });
+        setRealTx({ tx: res.transactionId, account: signerRef.toString(), marketHex, noteId, coSignMultisig });
         setTimeout(() => { try { builtin.refetch?.(); } catch (e) {} }, 2500); // reflect the lower balance
         window.txToast?.({
-          kind: "tx",
-          title: `${order.side} position sealed · ${order.amount} OBX staked`,
-          desc: `Your ${order.side} stake of ${order.amount} OBX is locked into a private position note. The chain records only its commitment — side, size and owner stay private.`,
+          kind: coSignMultisig ? "cosign" : "tx",
+          title: `${order.side} position sealed · ${order.amount} OBX staked${coSignMultisig ? " · Guardian-co-signed" : ""}`,
+          desc: `Your ${order.side} stake of ${order.amount} OBX is locked into a private position note${coSignMultisig ? ", approved by a 2-of-N Guardian co-sign" : ""}. The chain records only its commitment — side, size and owner stay private.`,
           tx: res.transactionId,
           account: signerRef.toString(),
         });

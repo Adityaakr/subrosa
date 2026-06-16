@@ -274,6 +274,7 @@ function ResolvedPanel({ m, resolution }) {
 function BetPanel({ m, balance, onPlace }) {
   const [side, setSide] = uS("YES");
   const [amt, setAmt] = uS(250);
+  const [protect, setProtect] = uS(false);
   const price = side === "YES" ? m.yes : 100 - m.yes; // in cents
   const shares = amt / (price / 100);
   const payout = shares; // $1 per winning share
@@ -338,11 +339,23 @@ function BetPanel({ m, balance, onPlace }) {
         <Row k="Profit" v={`${profit >= 0 ? "+" : ""}${window.fmtUsd(profit)} · ${roi >= 0 ? "+" : ""}${roi.toFixed(0)}%`} vc="var(--yes)" />
       </div>
 
-      <window.Btn variant="primary" size="lg" full icon="lock" onClick={() => onPlace({ market: m, side, amount: amt, price, shares })}>
-        Place private position
+      {/* optional Guardian co-sign on this bet */}
+      <button onClick={() => setProtect((p) => !p)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "11px 13px", marginBottom: 12, borderRadius: "var(--r-md)", cursor: "pointer", textAlign: "left", border: `1px solid ${protect ? "var(--accent)" : "var(--hair-2)"}`, background: protect ? "var(--accent-dim)" : "var(--surface)", transition: "all 140ms ease" }}>
+        <window.Icon name="shield-check" size={16} color={protect ? "var(--accent)" : "var(--faint)"} />
+        <span style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ display: "block", fontSize: 12.5, fontWeight: 600, color: "var(--text)" }}>Protect with Guardian</span>
+          <span style={{ display: "block", fontSize: 11, color: "var(--faint)" }}>Require a 2-of-N co-sign before this bet lands</span>
+        </span>
+        <span role="switch" aria-checked={protect} style={{ position: "relative", width: 38, height: 22, borderRadius: 999, flex: "none", background: protect ? "var(--accent)" : "var(--hair-2)", transition: "background 180ms" }}>
+          <span style={{ position: "absolute", top: 3, left: protect ? 19 : 3, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left 180ms", boxShadow: "0 1px 3px rgba(0,0,0,0.3)" }} />
+        </span>
+      </button>
+
+      <window.Btn variant="primary" size="lg" full icon="lock" onClick={() => onPlace({ market: m, side, amount: amt, price, shares, protect })}>
+        {protect ? "Co-sign & place position" : "Place private position"}
       </window.Btn>
       <p style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, margin: "12px 0 0", fontSize: 11.5, color: "var(--faint)", textAlign: "center" }}>
-        <window.Icon name="eye-off" size={13} color="var(--faint)" /> Recorded as a commitment — no owner, side or size revealed.
+        <window.Icon name="eye-off" size={13} color="var(--faint)" /> {protect ? "Guardian co-signs, then your stake is sealed as a private commitment." : "Recorded as a commitment — no owner, side or size revealed."}
       </p>
     </div>
   );
