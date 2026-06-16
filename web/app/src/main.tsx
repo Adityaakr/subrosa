@@ -19,7 +19,7 @@ import App from "./proto/app.tsx";
 // wall. In a real deploy, set these to your own reverse-proxied paths.
 const ORIGIN = typeof window !== "undefined" ? window.location.origin : "";
 const midenConfig = import.meta.env.DEV
-  ? { rpcUrl: `${ORIGIN}/miden-rpc`, prover: `${ORIGIN}/miden-prover`, noteTransportUrl: `${ORIGIN}/miden-transport` }
+  ? { rpcUrl: ORIGIN, prover: ORIGIN, noteTransportUrl: ORIGIN }
   : { rpcUrl: MIDEN_RPC_URL, prover: MIDEN_PROVER };
 
 createRoot(document.getElementById("root")!).render(

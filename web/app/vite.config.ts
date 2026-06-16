@@ -7,14 +7,16 @@ export default defineConfig({
   plugins: [react(), midenVitePlugin({ crossOriginIsolation: true })],
   // The Miden web client (WASM worker) talks gRPC-web to the testnet RPC +
   // delegated prover. Hitting them cross-origin fails under our COEP
-  // (require-corp) headers AND the endpoints send no CORS headers. So in dev we
-  // proxy them through the Vite server → the browser sees same-origin requests.
+  // (require-corp) headers AND the endpoints send no CORS headers. The Rust
+  // client also rejects any node URL that carries a path. So we point it at the
+  // app's OWN bare origin and route by gRPC service-path prefix to each upstream
+  // — same-origin to the browser, no CORS, valid node URL.
   // (A production deploy needs the equivalent reverse-proxy in front of it.)
   server: {
     proxy: {
-      "/miden-rpc": { target: "https://rpc.testnet.miden.io", changeOrigin: true, secure: true, ws: false, rewrite: (p) => p.replace(/^\/miden-rpc/, "") },
-      "/miden-prover": { target: "https://tx-prover.testnet.miden.io", changeOrigin: true, secure: true, ws: false, rewrite: (p) => p.replace(/^\/miden-prover/, "") },
-      "/miden-transport": { target: "https://transport.miden.io", changeOrigin: true, secure: true, ws: false, rewrite: (p) => p.replace(/^\/miden-transport/, "") },
+      "/rpc.Api": { target: "https://rpc.testnet.miden.io", changeOrigin: true, secure: true, ws: false },
+      "/remote_prover.Api": { target: "https://tx-prover.testnet.miden.io", changeOrigin: true, secure: true, ws: false },
+      "/miden_note_transport.MidenNoteTransport": { target: "https://transport.miden.io", changeOrigin: true, secure: true, ws: false },
     },
   },
   resolve: {
