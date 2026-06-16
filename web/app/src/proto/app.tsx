@@ -12,7 +12,10 @@ import { randomWord } from "../lib/miden";
 const MARKET_ID_HEX = "0x5ff0303f0b795d1039ca5b51d8480b";
 const OBX_FAUCET_HEX = "0x1201d9f8819d5220778535e4e2f08a";
 const WALLET_LS = "subrosa.wallet.id";
-const FAUCET_LS = "subrosa.faucet.id"; // per-browser test-OBX faucet (web SDK)
+// per-browser test-OBX faucet (web SDK). Versioned: bumping abandons faucets
+// created with old params (e.g. the pre-fix 1e9 maxSupply) so a correct one is
+// made automatically — no manual storage clearing needed.
+const FAUCET_LS = "subrosa.faucet.v2.id";
 const FUND_DECIMALS = 8;
 
 // The Miden WASM client is single-instance and rejects a call that overlaps an
