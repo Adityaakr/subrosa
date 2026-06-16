@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React from "react";
-/* Obscura prototype — the privacy-seal moment (centerpiece) */
+/* Subrosa prototype — the privacy-seal moment (centerpiece) */
 const { useState: sS, useEffect: sE, useRef: sR } = React;
 
 function Scramble({ target, active, dur = 900 }) {

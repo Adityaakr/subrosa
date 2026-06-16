@@ -1,7 +1,7 @@
 #![no_std]
 #![feature(alloc_error_handler)]
 
-//! Obscura — minimal binary prediction market (Phase 1).
+//! Subrosa — minimal binary prediction market (Phase 1).
 //!
 //! A PUBLIC account holding the per-outcome reserves that back a trivial CPMM.
 //! The reserves are public on purpose: that is what makes the *odds* trustworthy.

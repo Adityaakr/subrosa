@@ -1,7 +1,7 @@
 #![no_std]
 #![feature(alloc_error_handler)]
 
-//! Obscura tx-script: redeem a YES position (outcome = 1, 250 shares).
+//! Subrosa tx-script: redeem a YES position (outcome = 1, 250 shares).
 //! Succeeds only if the market resolved YES — the winning side.
 
 extern crate alloc;

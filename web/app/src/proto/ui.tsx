@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React from "react";
-/* Obscura prototype — shared UI (window.*) */
+/* Subrosa prototype — shared UI (window.*) */
 const { useState, useEffect, useRef } = React;
 
 /* ---------- helpers ---------- */
@@ -151,8 +151,8 @@ function Sidebar({ route, go, positionsCount }) {
   return (
     <aside style={{ width: 234, flex: "none", borderRight: "1px solid var(--hair)", background: "var(--surface)", display: "flex", flexDirection: "column", padding: "20px 16px", position: "relative", zIndex: 2 }}>
       <div style={{ display: "flex", alignItems: "center", padding: "4px 8px 22px" }}>
-        <img className="logo-on-light" src="/logo/obscura-wordmark-dark.svg" alt="Obscura" height="24" />
-        <img className="logo-on-dark" src="/logo/obscura-wordmark-light.svg" alt="Obscura" height="24" />
+        <img className="logo-on-light" src="/logo/subrosa-wordmark-dark.svg" alt="Subrosa" height="24" />
+        <img className="logo-on-dark" src="/logo/subrosa-wordmark-light.svg" alt="Subrosa" height="24" />
       </div>
       <nav style={{ display: "flex", flexDirection: "column", gap: 3 }}>
         {items.map((it) => <NavBtn key={it.k} it={it} on={active(it.k)} onClick={() => go(it.k)} />)}
@@ -180,7 +180,7 @@ function ThemeToggle() {
   const flip = () => {
     const n = !dark;
     document.documentElement.dataset.theme = n ? "dark" : "light";
-    try { localStorage.setItem("obscura-theme", n ? "dark" : "light"); } catch (e) {}
+    try { localStorage.setItem("subrosa-theme", n ? "dark" : "light"); } catch (e) {}
     setDark(n);
   };
   return (

@@ -1,8 +1,8 @@
 [package]
-name = "obscura-client"
+name = "subrosa-client"
 version = "0.1.0"
 edition = "2021"
-description = "Obscura — Miden client: account/tx helpers and privacy verification"
+description = "Subrosa — Miden client: account/tx helpers and privacy verification"
 
 # Pinned to match the live testnet node (see docs/VERSIONS.md, DECISIONS D-008).
 # `tonic` feature provides the gRPC node client (GrpcClient).

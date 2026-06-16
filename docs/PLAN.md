@@ -1,4 +1,4 @@
-# Obscura — Build Plan
+# Subrosa — Build Plan
 
 > Private prediction markets with confidential AI agents, on Miden.
 > **Tagline:** Bet without being watched. Public odds, private positions.
@@ -134,7 +134,7 @@ Defaults were taken ("do what's best"); change any of these any time:
 - **Faucet:** ✅ Phase-0 needed no faucet (account deploy is feeless). For Phase 1
   we'll mint test-collateral from **our own** fungible faucet (testnet only).
 - **Toolchain pin:** ✅ staying on `midenup`-managed `0.14.0` (verified end-to-end).
-- **Codename:** ✅ keeping "Obscura" unless you say otherwise.
+- **Codename:** ✅ keeping "Subrosa" unless you say otherwise.
 - **Oracle (Phase 2):** defaulting to the optimistic resolver (no external
   dependency); Pragma is an upgrade. Flag if you want Pragma wired earlier.
 

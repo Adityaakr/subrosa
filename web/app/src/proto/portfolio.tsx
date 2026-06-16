@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React from "react";
-/* Obscura prototype — Your positions + Agents */
+/* Subrosa prototype — Your positions + Agents */
 const { useState: pS } = React;
 
 function Toggle({ on, onClick, color = "var(--accent)" }) {

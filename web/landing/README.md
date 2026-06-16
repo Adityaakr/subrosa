@@ -14,5 +14,5 @@ cd web/landing && python3 -m http.server 8000   # http://localhost:8000
 - `assets/logo/` — wordmark. `image-slot.js` — drop-in image placeholder.
 
 Phase 3 wires this to a real Next.js app using the Miden web client (WASM) so
-proving happens in-browser. (Brand currently uses the "Obscura" working codename
+proving happens in-browser. (Brand currently uses the "Subrosa" working codename
 in copy/logo; rebrand to Subrosa is a pending task.)

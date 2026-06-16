@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React from "react";
-/* Obscura prototype — Markets home + Market detail + bet panel */
+/* Subrosa prototype — Markets home + Market detail + bet panel */
 const { useState: uS, useEffect: uE, useRef: uR } = React;
 
 function parseAbb(s) {

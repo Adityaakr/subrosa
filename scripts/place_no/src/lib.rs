@@ -1,7 +1,7 @@
 #![no_std]
 #![feature(alloc_error_handler)]
 
-//! Obscura tx-script: place a NO position of 100 (side = 0).
+//! Subrosa tx-script: place a NO position of 100 (side = 0).
 
 extern crate alloc;
 

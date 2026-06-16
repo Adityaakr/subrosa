@@ -47,7 +47,7 @@ explain accounts/notes/tx lifecycle in `NOTES_MIDEN.md`.  → **MET.**
 - Decision confirmed: `0.14.0` toolchain works end-to-end (D-002).
 
 **Defaults taken (per "do what's best"):** testnet default RPC
-(`rpc.testnet.miden.io`), `0.14.0` toolchain, codename "Obscura" kept.
+(`rpc.testnet.miden.io`), `0.14.0` toolchain, codename "Subrosa" kept.
 
 ---
 
@@ -75,7 +75,7 @@ Substrate for the prediction market, all committed on testnet:
 
 Explorer (all resolve): `testnet.midenscan.com/tx/0xbc34fd2c5898e8e32e48e3eb75c6d4060217be77b6efe04732ccda5157fe6969`
 
-This proves the core Miden privacy primitives work for Obscura: a **private
+This proves the core Miden privacy primitives work for Subrosa: a **private
 account** received + consumed a **private note**; the asset balance lives only in
 the local store. The explorer (client-rendered off the node) embeds no balance,
 asset, or recipient for the private account/note.
@@ -183,7 +183,7 @@ Remaining pricing fast-follow: on-chain CPMM/LMSR (odds computed off-chain today
 
 ## Phase 3 — Web client (browser proving + full product dapp)  ✅ working
 
-Rebuilt as the **full design** (Obscura design kit): a **dark, multi-screen
+Rebuilt as the **full design** (Subrosa design kit): a **dark, multi-screen
 product dapp** — Shell + nav (**Markets · Agents · Portfolio**):
 - **Markets** — grid + live on-chain odds (read from the market account).
 - **Market detail** — bet ticket → **Place private position** submits a REAL

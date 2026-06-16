@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React from "react";
-/* Obscura prototype — Lucide icons (https://lucide.dev, ISC). Copied geometry.
+/* Subrosa prototype — Lucide icons (https://lucide.dev, ISC). Copied geometry.
    window.Icon — 24x24, stroke, round caps, currentColor. */
 (function () {
   const P = {

@@ -5,7 +5,7 @@ are public** but each **position is private** — the chain stores only a
 commitment. Everything below ran on **Miden testnet**; transaction hashes are
 real and verifiable on [testnet.midenscan.com](https://testnet.midenscan.com).
 
-> Codename note: the working name in the code/landing is "Obscura"; the project
+> Codename note: the working name in the code/landing is "Subrosa"; the project
 > is "Subrosa" (sub rosa = in secret).
 
 ---

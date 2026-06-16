@@ -1,7 +1,7 @@
 #![no_std]
 #![feature(alloc_error_handler)]
 
-//! Obscura tx-script: attempt to redeem a NO position (outcome = 2, 100 shares).
+//! Subrosa tx-script: attempt to redeem a NO position (outcome = 2, 100 shares).
 //! MUST abort when the market resolved YES — losing notes can't redeem.
 
 extern crate alloc;

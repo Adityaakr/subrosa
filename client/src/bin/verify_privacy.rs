@@ -9,7 +9,7 @@
 //! accounts (full on-chain state) and `FetchedAccount::Private(AccountId, _)`
 //! for private ones (a commitment only — no vault, no balances). If the node
 //! only has a commitment for the trader, then the 250 OBX position is NOT
-//! visible on-chain — which is the Obscura guarantee.
+//! visible on-chain — which is the Subrosa guarantee.
 //!
 //! API verified against docs.rs/miden-client/0.14.9:
 //!   - miden_client::rpc::Endpoint::testnet()

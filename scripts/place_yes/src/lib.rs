@@ -1,7 +1,7 @@
 #![no_std]
 #![feature(alloc_error_handler)]
 
-//! Obscura — transaction script: place a YES position of 250 on the market.
+//! Subrosa — transaction script: place a YES position of 250 on the market.
 //!
 //! Calls the deployed `market` account's `place(side, amount)` procedure
 //! (YES = 1). This moves the PUBLIC reserves (yes_reserve += 250, volume += 250)

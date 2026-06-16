@@ -1,5 +1,5 @@
 // @ts-nocheck
-/* Obscura prototype — market & agent data (window.OBS) */
+/* Subrosa prototype — market & agent data (window.OBS) */
 (function () {
   // a gently wandering odds history ending near `end`
   function series(end, n, vol) {

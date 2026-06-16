@@ -21,7 +21,7 @@ faucets alike. An account has four parts:
 code, storage, vault) — not full state.
 - **Public** storage mode → full state on-chain, visible to all.
 - **Private** storage mode → only a state commitment on-chain; data stays with
-  the owner. *(This is the privacy primitive Obscura is built on.)*
+  the owner. *(This is the privacy primitive Subrosa is built on.)*
 
 **Account types** (`AccountType`): `RegularAccountUpdatableCode`,
 `RegularAccountImmutableCode`, `FungibleFaucet`, `NonFungibleFaucet`.
@@ -39,7 +39,7 @@ Rust types (`miden_client::account`): `Account`, `AccountBuilder`,
 Sources: `miden-docs/.../accounts/{introduction,storage,components}.md`;
 `https://docs.rs/miden-client/0.15.0/miden_client/account/index.html`.
 
-→ **Obscura mapping:** market = **public** account (trustworthy odds); trader &
+→ **Subrosa mapping:** market = **public** account (trustworthy odds); trader &
 agent = **private** accounts (confidential positions/strategy).
 
 ---
@@ -75,7 +75,7 @@ selects this.
 
 Sources: `miden-docs/.../notes/{introduction,note-types,note-scripts}.md`.
 
-→ **Obscura mapping:** position note = **private** note carrying YES/NO shares
+→ **Subrosa mapping:** position note = **private** note carrying YES/NO shares
 into the trader's private account. Settlement window = **P2IDE** time-lock.
 
 ---
@@ -170,7 +170,7 @@ Verified flags (from `--help`):
   Default auth component is `RpoFalcon512` (override via `-p auth/<scheme>`;
   available: `basic-auth`, `acl-auth`, `ecdsa-auth`, `multisig-auth`, `no-auth`).
 - `mint --target <ID> --asset <AMOUNT>::<FAUCET_ID|SYMBOL> --note-type public|private [--force] [--delegate-proving]`.
-  ⚠️ `mint` mints **from a fungible faucet you control** → for Obscura's
+  ⚠️ `mint` mints **from a fungible faucet you control** → for Subrosa's
   test-collateral we create our own faucet (`new-account --account-type
   fungible-faucet -p basic-fungible-faucet.masp`), not an external web faucet.
 - `account` (list) · `account -s <ID>` (detail) · `account --default <ID>`.
@@ -205,9 +205,9 @@ Source: `miden-docs/.../accounts/components.md`, `.../notes/note-scripts.md`.
 
 ---
 
-## 7. Component → Miden primitive map (Obscura)
+## 7. Component → Miden primitive map (Subrosa)
 
-| Obscura component | Miden primitive(s) | Privacy |
+| Subrosa component | Miden primitive(s) | Privacy |
 |---|---|---|
 | Market account | **public** (network) account + components + storage maps | reserves/odds/resolution public |
 | Position note | **private** note (P2ID-style) into a private account | owner/side/size hidden |

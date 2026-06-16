@@ -10,7 +10,7 @@ import { randomWord } from "../lib/miden";
 const MARKET_ID_HEX = "0x5ff0303f0b795d1039ca5b51d8480b";
 const shortHex = (s) => (s && s.length > 14 ? `${s.slice(0, 8)}…${s.slice(-4)}` : s);
 
-/* Obscura prototype — root app: routing, state, seal flow.
+/* Subrosa prototype — root app: routing, state, seal flow.
    The seal UX is the design's; place() ALSO fires a REAL on-chain tx (private
    account + position note) and surfaces its hash in the seal + positions. */
 function App() {

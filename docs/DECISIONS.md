@@ -157,4 +157,4 @@ requires); avoid 0.15.x.
 - Testnet RPC endpoint (default vs current rotated URL).
 - Faucet authorization for test funds.
 - Toolchain `0.14.0` vs crate `0.15.0` (D-002).
-- Keep codename "Obscura" or rename.
+- Keep codename "Subrosa" or rename.

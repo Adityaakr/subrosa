@@ -1,16 +1,16 @@
-# Obscura
+# Subrosa
 
 **Private prediction markets with confidential AI agents, on Miden.**
 Public, trustworthy odds — but your position, size, and P&L stay private. The
 network records only a commitment.
 
-> Obscura is a placeholder codename on Miden. Pre-mainnet; APIs verified against
+> Subrosa is a placeholder codename on Miden. Pre-mainnet; APIs verified against
 > live docs, not assumed.
 
 ## Repository layout
 
 ```
-obscura/
+subrosa/
 ├── docs/            planning + tracking (start here)
 │   ├── PLAN.md         roadmap, phase status, open questions  ← read first
 │   ├── VERSIONS.md     pinned toolchain & crate versions

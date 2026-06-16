@@ -1,7 +1,7 @@
 #![no_std]
 #![feature(alloc_error_handler)]
 
-//! Obscura tx-script: optimistic resolver records outcome YES (1).
+//! Subrosa tx-script: optimistic resolver records outcome YES (1).
 
 extern crate alloc;
 
