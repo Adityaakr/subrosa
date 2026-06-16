@@ -177,32 +177,47 @@ function useWallet() {
     } finally { setFunding(false); }
   };
 
+  // Mint a PUBLIC test-OBX note from our web faucet to any address (used to fund
+  // the external MidenFi wallet, which then consumes via its own extension).
+  // Returns the faucet id so the caller can match the resulting note/asset.
+  const mintTo = async (targetAddress) => {
+    const fid = await ensureFaucet();
+    await wasmRetry(() => mint({ targetAccountId: targetAddress, faucetId: fid, amount: parseAssetAmount("1000", FUND_DECIMALS), noteType: "public" }));
+    return fid;
+  };
+
   return {
     connected: !!account || !!walletId, connecting, funding, fundMsg, error,
-    walletId: address, account,
+    walletId: address, account, faucetId,
     balance, balanceLabel: formatAssetAmount(balance, FUND_DECIMALS),
-    connect, disconnect, fund, refetch: q.refetch,
+    connect, disconnect, fund, mintTo, refetch: q.refetch,
   };
 }
 
 /* External MidenFi ("Miden Wallet") extension via the wallet-adapter. select()
    the injected adapter, then connect() prompts the extension. Balance is read
    from the wallet's own assets. */
+const sameFaucet = (f, fid) => {
+  if (!f || !fid) return false;
+  try { return accountIdsEqual(f, fid); } catch (e) { return String(f).toLowerCase() === String(fid).toLowerCase(); }
+};
+
 function useMidenFi() {
   const a = useMidenFiAdapter();
   const [balance, setBalance] = React.useState(0n);
-  React.useEffect(() => {
-    let live = true;
-    if (a.connected && a.requestAssets) {
-      a.requestAssets().then((assets) => {
-        if (!live) return;
-        const list = Array.isArray(assets) ? assets : (assets?.assets || []);
-        const match = list.find((x) => String(x.faucetId ?? x.assetId ?? x.faucet ?? "").toLowerCase().includes(OBX_FAUCET_HEX.slice(2, 10)));
-        try { setBalance(match ? BigInt(match.amount ?? match.balance ?? 0) : 0n); } catch (e) { setBalance(0n); }
-      }).catch(() => {});
-    } else if (!a.connected) setBalance(0n);
-    return () => { live = false; };
+  const [tick, setTick] = React.useState(0);
+  const refreshAssets = React.useCallback(async () => {
+    if (!a.connected || !a.requestAssets) { setBalance(0n); return; }
+    let fid = null; try { fid = localStorage.getItem(FAUCET_LS); } catch (e) {}
+    try {
+      const assets = await a.requestAssets();
+      const list = Array.isArray(assets) ? assets : (assets?.assets || []);
+      // match our per-browser test-OBX faucet; if none yet, fall back to first asset
+      const match = (fid && list.find((x) => sameFaucet(x.faucetId ?? x.assetId, fid))) || null;
+      setBalance(match ? BigInt(match.amount ?? match.balance ?? 0) : 0n);
+    } catch (e) {}
   }, [a.connected]);
+  React.useEffect(() => { refreshAssets(); }, [a.connected, tick, refreshAssets]);
 
   const connect = async () => {
     const w = a.wallets && a.wallets[0];
@@ -214,8 +229,10 @@ function useMidenFi() {
   return {
     available: (a.wallets && a.wallets.length > 0) || false,
     connected: a.connected, connecting: a.connecting,
-    address: a.address, balance, balanceLabel: formatAssetAmount(balance, 8),
+    address: a.address, balance, balanceLabel: formatAssetAmount(balance, FUND_DECIMALS),
     connect, disconnect: a.disconnect,
+    requestConsumableNotes: a.requestConsumableNotes, requestConsume: a.requestConsume,
+    refreshAssets, refresh: () => setTick((t) => t + 1),
   };
 }
 
@@ -233,6 +250,41 @@ function App() {
   const builtin = useWallet();
   const mf = useMidenFi();
   const { execute } = useTransaction();
+  const [mfFunding, setMfFunding] = React.useState(false);
+  const [mfFundMsg, setMfFundMsg] = React.useState(null);
+
+  // Fund the EXTERNAL MidenFi wallet: our web client mints a public OBX note to
+  // its address (we hold the faucet key), then the extension consumes it via
+  // requestConsume (its own client claims the asset).
+  const fundMidenFi = async () => {
+    if (!mf.address || mfFunding) return;
+    setMfFunding(true); setMfFundMsg("Minting 1,000 OBX…");
+    try {
+      const fid = await builtin.mintTo(mf.address);
+      setMfFundMsg("Claiming in Miden Wallet…");
+      let done = false;
+      for (let i = 0; i < 16; i++) {
+        await new Promise((r) => setTimeout(r, 2500));
+        let cn = [];
+        try { cn = (await mf.requestConsumableNotes?.()) || []; } catch (e) {}
+        const list = Array.isArray(cn) ? cn : (cn?.consumableNotes || []);
+        const n = list.find((x) => (x.assets || []).some((as) => sameFaucet(as.faucetId ?? as.assetId, fid)));
+        if (n) {
+          const as = (n.assets || [])[0] || {};
+          const amt = Number(as.amount ?? as.amountAsBigInt ?? parseAssetAmount("1000", FUND_DECIMALS));
+          await mf.requestConsume({ faucetId: fid, noteId: n.noteId, noteType: "public", amount: amt });
+          done = true; break;
+        }
+      }
+      await mf.refreshAssets?.();
+      setMfFundMsg(done ? "Funded ✓" : "Minted — claim it in your Miden Wallet");
+      setTimeout(() => setMfFundMsg(null), 6000);
+    } catch (e) {
+      console.warn("[fund:midenfi] failed:", e);
+      setMfFundMsg("Funding failed — see console");
+      setTimeout(() => setMfFundMsg(null), 6000);
+    } finally { setMfFunding(false); }
+  };
 
   // Unified wallet model for the UI. MidenFi takes precedence when connected;
   // otherwise the built-in browser wallet.
@@ -240,14 +292,16 @@ function App() {
   const wallet = {
     connected: !!kind, kind,
     connecting: builtin.connecting || mf.connecting,
-    funding: builtin.funding, fundMsg: builtin.fundMsg, error: builtin.error,
+    funding: kind === "midenfi" ? mfFunding : builtin.funding,
+    fundMsg: kind === "midenfi" ? mfFundMsg : builtin.fundMsg,
+    error: builtin.error,
     midenfiAvailable: mf.available,
     walletId: kind === "midenfi" ? mf.address : builtin.walletId,
     balanceLabel: kind === "midenfi" ? mf.balanceLabel : builtin.balanceLabel,
     connectBuiltin: builtin.connect,
     connectMidenFi: mf.connect,
     disconnect: () => (kind === "midenfi" ? mf.disconnect() : builtin.disconnect()),
-    fund: builtin.fund, // faucet credits the built-in wallet
+    fund: kind === "midenfi" ? fundMidenFi : builtin.fund,
   };
 
   const go = (r) => { if (r !== "detail") setMarket(null); setRoute(r); };

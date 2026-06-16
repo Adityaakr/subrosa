@@ -247,14 +247,10 @@ function TopBar({ left, wallet }) {
               <span className="mono" style={{ fontSize: 13, color: "var(--text)", fontWeight: 500 }}>{w.balanceLabel ?? "0"}</span>
               <span className="mono" style={{ fontSize: 11, color: "var(--faint)" }}>OBX</span>
             </div>
-            {w.kind === "builtin" ? (
-              <>
-                {w.fundMsg ? <span className="mono" style={{ fontSize: 11, color: "var(--faint)", maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{w.fundMsg}</span> : null}
-                <button onClick={() => w.fund && w.fund()} disabled={w.funding} title="Mint test OBX to this wallet" style={{ display: "flex", alignItems: "center", gap: 6, height: 36, padding: "0 12px", borderRadius: "var(--r-md)", border: "1px solid var(--hair-2)", background: "var(--surface-2)", color: "var(--text)", fontSize: 13, fontWeight: 500, cursor: w.funding ? "default" : "pointer", opacity: w.funding ? 0.7 : 1 }}>
-                  <window.Icon name="plus" size={14} color="var(--accent)" /> {w.funding ? "Funding…" : "Fund"}
-                </button>
-              </>
-            ) : null}
+            {w.fundMsg ? <span className="mono" style={{ fontSize: 11, color: "var(--faint)", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{w.fundMsg}</span> : null}
+            <button onClick={() => w.fund && w.fund()} disabled={w.funding} title="Mint test OBX to this wallet" style={{ display: "flex", alignItems: "center", gap: 6, height: 36, padding: "0 12px", borderRadius: "var(--r-md)", border: "1px solid var(--hair-2)", background: "var(--surface-2)", color: "var(--text)", fontSize: 13, fontWeight: 500, cursor: w.funding ? "default" : "pointer", opacity: w.funding ? 0.7 : 1 }}>
+              <window.Icon name="plus" size={14} color="var(--accent)" /> {w.funding ? "Funding…" : "Fund"}
+            </button>
             <button onClick={() => w.disconnect && w.disconnect()} title={`${w.kind === "midenfi" ? "Miden Wallet" : "Subrosa Wallet"} — click to disconnect`} style={{ display: "flex", alignItems: "center", gap: 8, height: 36, padding: "0 10px 0 12px", borderRadius: "var(--r-md)", border: "1px solid var(--hair-2)", background: "var(--surface-2)", color: "var(--text)", cursor: "pointer" }}>
               <span style={{ width: 18, height: 18, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", flex: "none", background: w.kind === "midenfi" ? "#0C0C0E" : "linear-gradient(135deg,#FF5500,#A300D6)", fontFamily: "var(--disp)", fontWeight: 700, color: "var(--accent)", fontSize: 11 }}>{w.kind === "midenfi" ? "m" : ""}</span>
               <span className="mono" style={{ fontSize: 12.5 }}>{shortId(w.walletId)}</span>
