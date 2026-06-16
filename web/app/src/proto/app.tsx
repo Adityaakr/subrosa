@@ -26,7 +26,9 @@ function useWallet() {
   const { sync } = useSyncState();
   const notes = useNotes();
   const notesRef = React.useRef([]);
-  React.useEffect(() => { notesRef.current = notes.consumableNotes || []; }, [notes.consumableNotes]);
+  // consumableNoteSummaries carry a string `id` that consume() accepts (the raw
+  // ConsumableNoteRecord objects are NOT a valid consume input).
+  React.useEffect(() => { notesRef.current = notes.consumableNoteSummaries || []; }, [notes.consumableNoteSummaries]);
 
   const idOf = (a) => { try { return (a && a.id ? a.id() : a)?.toString?.() ?? String(a); } catch (e) { return String(a); } };
   const sameId = (a, id) => { if (!a || !id) return false; try { return accountIdsEqual(a, id); } catch (e) { return idOf(a) === id; } };
@@ -101,9 +103,9 @@ function useWallet() {
         await new Promise((res) => setTimeout(res, 3000));
         try { await sync?.(); } catch (e) {}
         try { await notes.refetch?.(); } catch (e) {}
-        const cn = notesRef.current || [];
-        if (cn.length) {
-          try { await consume({ accountId: id, notes: cn }); } catch (e) { console.warn("[fund] consume failed:", e); }
+        const ids = (notesRef.current || []).map((s) => s.id).filter(Boolean);
+        if (ids.length) {
+          try { await consume({ accountId: id, notes: ids }); } catch (e) { console.warn("[fund] consume failed:", e); }
           break;
         }
       }

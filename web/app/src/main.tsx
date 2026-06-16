@@ -31,7 +31,14 @@ createRoot(document.getElementById("root")!).render(
     <WalletProvider wallets={walletAdapters} network={WalletAdapterNetwork.Testnet} autoConnect={false}>
       <MidenProvider
         config={midenConfig}
-        loadingComponent={<div className="backdrop" />}
+        loadingComponent={
+          <div className="backdrop" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh" }}>
+            <div style={{ textAlign: "center" }}>
+              <img src="/logo/subrosa-mark.svg" width={46} height={46} style={{ borderRadius: 11 }} alt="Subrosa" />
+              <div className="mono" style={{ marginTop: 14, fontSize: 11.5, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--faint)" }}>Loading Subrosa — initialising client…</div>
+            </div>
+          </div>
+        }
       >
         <div className="backdrop" />
         <App />
