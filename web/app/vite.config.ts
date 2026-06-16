@@ -18,4 +18,13 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ["@miden-sdk/miden-sdk", "@miden-sdk/react"],
   },
+  // Multi-page: landing at "/" (index.html), the React dapp at "/app/" (app/index.html).
+  build: {
+    rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, "index.html"),
+        app: path.resolve(__dirname, "app/index.html"),
+      },
+    },
+  },
 });

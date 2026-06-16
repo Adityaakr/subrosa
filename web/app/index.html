@@ -1,13 +1,442 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Subrosa — private prediction markets on Miden</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Obscura — Private prediction markets on Miden</title>
+<style>@font-face{font-family:"Space Grotesk";src:url("/fonts/space-grotesk.woff2") format("woff2");font-weight:300 700;font-display:swap}@font-face{font-family:"Inter";src:url("/fonts/inter.woff2") format("woff2");font-weight:100 900;font-display:swap}@font-face{font-family:"JetBrains Mono";src:url("/fonts/jetbrains-mono.woff2") format("woff2");font-weight:100 800;font-display:swap}:root{--font-display:"Space Grotesk",system-ui,sans-serif;--font-body:"Inter",system-ui,sans-serif;--font-mono:"JetBrains Mono",ui-monospace,monospace}</style>
+<style>
+  :root{
+    --ink:#0C0C0E; --ink-2:#191919; --gray:#484848; --muted:#6E7079;
+    --orange:#FF5500; --orange-d:#FF4D00; --line:#E7E7E2;
+    --ash:#F7F7F5; --ash-2:#F1F1ED; --white:#FFFFFF;
+    --disp:var(--font-display); --ui:var(--font-body); --mono:var(--font-mono);
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{margin:0;background:var(--white);color:var(--ink-2);font-family:var(--ui);-webkit-font-smoothing:antialiased;}
+  a{color:inherit;text-decoration:none;}
+  ::selection{background:var(--orange);color:#fff;}
+  .wrap{max-width:1240px;margin:0 auto;padding:0 40px;}
+  .mono{font-family:var(--mono);}
+  .eyebrow{font-family:var(--mono);font-size:12px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:var(--orange);}
+  h1,h2,h3{font-family:var(--disp);font-weight:700;color:var(--ink);margin:0;letter-spacing:-0.03em;line-height:1;}
+  p{margin:0;}
+
+  /* nav */
+  nav.top{position:sticky;top:0;z-index:50;background:rgba(255,255,255,0.86);backdrop-filter:blur(12px);border-bottom:1px solid var(--line);}
+  nav.top .row{display:flex;align-items:center;height:72px;gap:40px;}
+  .navlinks{display:flex;gap:30px;margin-left:24px;}
+  .navlinks a{display:inline-flex;align-items:center;gap:6px;font-size:15px;font-weight:600;color:var(--ink-2);}
+  .navlinks a .chev{color:var(--orange);font-family:var(--mono);font-weight:700;}
+  .navlinks a:hover{color:var(--orange);}
+  .btn{display:inline-flex;align-items:center;gap:9px;height:44px;padding:0 20px;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;border:1px solid transparent;transition:all .15s cubic-bezier(.22,1,.36,1);white-space:nowrap;}
+  .btn-primary{background:var(--orange);color:#fff;}
+  .btn-primary:hover{background:var(--orange-d);box-shadow:0 8px 24px rgba(255,85,0,.28);transform:translateY(-1px);}
+  .btn-ghost{background:transparent;color:var(--ink);border-color:var(--line);}
+  .btn-ghost:hover{border-color:var(--ink);}
+  .btn-lg{height:54px;padding:0 26px;font-size:16px;border-radius:9px;}
+
+  /* hero */
+  .hero{padding:64px 0 0;}
+  .hero-canvas-wrap{position:relative;border:1px solid var(--line);border-radius:4px;overflow:hidden;background:var(--white);}
+  #halftone{display:block;width:100%;height:440px;}
+  .hero-tag{position:absolute;top:20px;left:22px;}
+  .hero-idx{position:absolute;top:20px;right:22px;font-family:var(--mono);font-size:12px;color:var(--orange);letter-spacing:.1em;}
+  .hero h1{font-size:clamp(52px,9vw,116px);margin:34px 0 0;}
+  .hero h1 .o{color:var(--orange);}
+  .hero-sub{display:flex;justify-content:space-between;align-items:flex-end;gap:40px;margin-top:26px;flex-wrap:wrap;}
+  .hero-sub p{font-size:20px;line-height:1.5;color:var(--gray);max-width:560px;}
+  .hero-cta{display:flex;gap:12px;}
+
+  /* stats */
+  .stats{border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin-top:72px;}
+  .stats .row{display:grid;grid-template-columns:repeat(4,1fr);}
+  .stat{padding:30px 40px;border-right:1px solid var(--line);}
+  .stat:last-child{border-right:none;}
+  .stat .v{font-family:var(--mono);font-size:34px;font-weight:500;color:var(--ink);letter-spacing:-.02em;}
+  .stat .l{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-top:8px;}
+
+  /* section band */
+  .band{background:var(--orange);color:#fff;}
+  .band .row{display:flex;align-items:center;justify-content:space-between;padding:26px 40px;}
+  .band h2{color:#fff;font-size:clamp(28px,3.6vw,46px);}
+  .band .idx{font-family:var(--mono);font-size:14px;letter-spacing:.1em;color:rgba(255,255,255,.85);white-space:nowrap;}
+
+  section.block{padding:72px 0;}
+  .lead{font-size:clamp(26px,3vw,38px);font-family:var(--disp);font-weight:700;letter-spacing:-.02em;color:var(--ink);line-height:1.06;max-width:780px;}
+  .body{font-size:18px;line-height:1.6;color:var(--gray);max-width:620px;}
+
+  /* comparison */
+  .cmp{border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--white);}
+  .cmp .h,.cmp .r{display:grid;grid-template-columns:1.5fr 1fr auto 1fr;gap:20px;align-items:center;padding:16px 26px;}
+  .cmp .h{background:var(--ash);border-bottom:1px solid var(--line);}
+  .cmp .h span{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);}
+  .cmp .r{border-bottom:1px solid var(--line);}
+  .cmp .r:last-child{border-bottom:none;}
+  .cmp .attr{font-size:16px;font-weight:600;color:var(--ink-2);}
+  .cmp .pub{font-family:var(--mono);font-size:14px;color:var(--muted);}
+  .cmp .arr{color:#C9C9C2;}
+  .cmp .prv{font-family:var(--mono);font-size:14px;font-weight:600;}
+
+  /* feature row */
+  .feat{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center;}
+  .feat.rev{direction:rtl;}
+  .feat.rev>*{direction:ltr;}
+  image-slot{display:block;width:100%;height:420px;border:1px solid var(--line);border-radius:6px;}
+  /* agent visual */
+  .agent-vis{position:relative;width:100%;height:440px;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--white);}
+  #agentfield{position:absolute;inset:0;width:100%;height:100%;}
+  .av-tag{position:absolute;font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;padding:5px 9px;border-radius:5px;background:#fff;border:1px solid var(--line);box-shadow:0 2px 8px rgba(12,12,14,.06);white-space:nowrap;}
+  .agent-card{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:330px;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 24px 60px rgba(12,12,14,.16);padding:18px;display:flex;flex-direction:column;gap:14px;}
+  .ac-head{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+  .ac-id{display:flex;align-items:center;gap:11px;min-width:0;}
+  .ac-ico{width:40px;height:40px;border-radius:9px;background:rgba(163,0,214,.10);border:1px solid rgba(163,0,214,.28);display:flex;align-items:center;justify-content:center;flex:none;}
+  .ac-name{font-family:var(--mono);font-size:13.5px;font-weight:500;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .ac-strat{font-size:12px;color:var(--gray);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .ac-status{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:#16A34A;background:rgba(22,163,74,.12);border-radius:999px;padding:4px 9px;white-space:nowrap;}
+  .ac-dot{width:6px;height:6px;border-radius:50%;background:#16A34A;}
+  .ac-redact{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:8px;background:var(--ash);border:1px solid var(--line);}
+  .ac-bar{height:8px;border-radius:999px;background:#EDEDE9;overflow:hidden;}
+  .ac-bar > i{display:block;height:100%;width:64%;border-radius:999px;background:linear-gradient(90deg,#A300D6,#FF5500);}
+  .ac-meta{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11.5px;color:var(--muted);}
+  .ac-foot{display:flex;align-items:center;justify-content:space-between;padding-top:13px;border-top:1px solid var(--line);}
+
+  /* layers / code texture */
+  .codebg{position:relative;background:var(--ash);border-top:1px solid var(--line);border-bottom:1px solid var(--line);overflow:hidden;}
+  .codetex{position:absolute;inset:0;font-family:var(--mono);font-size:15px;line-height:1.7;color:rgba(12,12,14,.045);white-space:pre-wrap;word-break:break-all;padding:24px 40px;pointer-events:none;user-select:none;z-index:0;}
+  .layers{position:relative;z-index:1;display:grid;grid-template-columns:repeat(3,1fr);gap:18px;}
+  .layer{background:var(--white);border:1px solid var(--line);border-radius:8px;padding:24px;box-shadow:0 1px 2px rgba(12,12,14,.04);}
+  .layer .lab{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;}
+  .layer h3{font-size:21px;letter-spacing:-.01em;margin:12px 0 8px;}
+  .layer p{font-size:14.5px;line-height:1.55;color:var(--gray);}
+
+  /* markets preview */
+  .mkts{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;}
+  .mcard{background:var(--white);border:1px solid var(--line);border-radius:12px;padding:18px;transition:all .18s cubic-bezier(.22,1,.36,1);cursor:pointer;display:flex;flex-direction:column;gap:14px;min-height:190px;}
+  .mcard:hover{transform:translateY(-3px);border-color:#D6D6CE;box-shadow:0 16px 40px rgba(12,12,14,.10);}
+  .mcat{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);}
+  .mcard h3{font-size:16px;letter-spacing:-.01em;line-height:1.28;color:var(--ink);min-height:42px;font-weight:700;}
+  .obar{display:flex;gap:3px;height:7px;}
+  .obar .y{background:#16A34A;border-radius:999px 3px 3px 999px;}
+  .obar .n{background:rgba(229,72,77,.5);border-radius:3px 999px 999px 3px;}
+  .mrow{display:flex;justify-content:space-between;font-family:var(--mono);font-size:12px;white-space:nowrap;}
+  .mrow .yes{color:#16A34A;} .mrow .no{color:#E5484D;}
+  .mfoot{display:flex;justify-content:space-between;padding-top:12px;border-top:1px solid var(--line);font-family:var(--mono);font-size:12px;color:var(--muted);}
+
+  /* CTA */
+  .cta{background:var(--ink);color:#fff;border-radius:0;}
+  .cta .inner{padding:96px 40px;text-align:center;position:relative;overflow:hidden;}
+  .cta h2{color:#fff;font-size:clamp(38px,6vw,76px);}
+  .cta h2 .o{color:var(--orange);}
+  .cta p{color:#B8B8BE;font-size:18px;margin:18px auto 0;max-width:520px;}
+  .cta .glow{position:absolute;inset:0;background:radial-gradient(50% 70% at 50% 120%,rgba(255,85,0,.4),transparent 70%);pointer-events:none;}
+
+  /* footer */
+  footer{border-top:1px solid var(--line);padding:40px 0;}
+  footer .row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;}
+  footer .links{display:flex;gap:24px;font-size:14px;color:var(--gray);}
+  footer .links a:hover{color:var(--orange);}
+  .builton{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;letter-spacing:.06em;color:var(--muted);white-space:nowrap;}
+
+  @media (max-width:920px){
+    .feat,.layers,.mkts,.stats .row{grid-template-columns:1fr;}
+    .stat{border-right:none;border-bottom:1px solid var(--line);}
+    .wrap{padding:0 22px;}
+    .navlinks{display:none;}
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="top">
+  <div class="wrap row">
+    <a href="#top" style="display:flex;align-items:center;"><img src="/logo/obscura-wordmark-dark.svg" alt="Obscura" height="28"></a>
+    <div class="navlinks">
+      <a href="#unlock">Product <span class="chev">&rsaquo;</span></a>
+      <a href="#how">How it works <span class="chev">&rsaquo;</span></a>
+      <a href="#agents">Agents <span class="chev">&rsaquo;</span></a>
+      <a href="#markets">Markets <span class="chev">&rsaquo;</span></a>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:12px;align-items:center;">
+      <span class="builton">BUILT ON MIDEN</span>
+      <a class="btn btn-primary" href="/app/">Launch app &rsaquo;</a>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<header id="top" class="hero">
+  <div class="wrap">
+    <div class="hero-canvas-wrap">
+      <span class="hero-tag eyebrow">Private prediction markets · on Miden</span>
+      <span class="hero-idx">[ MIDEN ]</span>
+      <canvas id="halftone"></canvas>
+    </div>
+    <h1>Bet without<br>being <span class="o">watched.</span></h1>
+    <div class="hero-sub">
+      <p>Public, trustworthy odds — but your position, size and P&amp;L stay private. On every other chain, your bets are visible. Here, the network records only a commitment.</p>
+      <div class="hero-cta">
+        <a class="btn btn-primary btn-lg" href="/app/">Launch app &rsaquo;</a>
+        <a class="btn btn-ghost btn-lg" href="#how">How it works</a>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- STATS -->
+<div class="stats" style="margin-top:64px;">
+  <div class="wrap"><div class="row">
+    <div class="stat"><div class="v">4.74M+</div><div class="l">Agent transactions</div></div>
+    <div class="stat"><div class="v">316</div><div class="l">Live confidential agents</div></div>
+    <div class="stat"><div class="v">$500k+</div><div class="l">Volume traded</div></div>
+    <div class="stat"><div class="v">0</div><div class="l">Positions visible on-chain</div></div>
+  </div></div>
+</div>
+
+<!-- [01] THE UNLOCK -->
+<div id="unlock" class="band"><div class="wrap row">
+  <h2>The privacy unlock</h2><span class="idx">[ 01 ]</span>
+</div></div>
+<section class="block"><div class="wrap">
+  <div style="display:flex;flex-direction:column;gap:18px;margin-bottom:40px;">
+    <p class="lead">Public chains watch you.<br>Obscura doesn't.</p>
+    <p class="body">On a public market, everyone sees who holds what, how big, and their running P&amp;L — which invites front-running and copy-trading. Miden makes accounts and notes private by default, so a position is confidential until you choose to reveal it. Odds stay public, because you want honest prices.</p>
+  </div>
+  <div class="cmp">
+    <div class="h"><span>What's exposed</span><span>Public chain</span><span></span><span>Obscura</span></div>
+    <div class="r"><span class="attr">Holder identity</span><span class="pub">visible</span><span class="arr">&rarr;</span><span class="prv" style="color:var(--orange-d)">private</span></div>
+    <div class="r"><span class="attr">Running P&amp;L</span><span class="pub">visible</span><span class="arr">&rarr;</span><span class="prv" style="color:var(--orange-d)">private</span></div>
+    <div class="r"><span class="attr">Agent strategy</span><span class="pub">copyable</span><span class="arr">&rarr;</span><span class="prv" style="color:var(--orange-d)">confidential</span></div>
+    <div class="r"><span class="attr">Market odds</span><span class="pub">public</span><span class="arr">&rarr;</span><span class="prv" style="color:#066EFF">public</span></div>
+  </div>
+</div></section>
+
+<!-- [02] HOW IT WORKS -->
+<div id="how" class="band"><div class="wrap row">
+  <h2>How it works</h2><span class="idx">[ 02 ]</span>
+</div></div>
+<div class="codebg">
+  <div class="codetex" id="codetex"></div>
+  <section class="block"><div class="wrap">
+    <p class="lead" style="margin-bottom:36px;">Three layers. One private position.</p>
+    <div class="layers">
+      <div class="layer">
+        <div class="lab" style="color:var(--orange)">CLIENT</div>
+        <h3>In-browser proving</h3>
+        <p>A web app with client-side execution and the Polybaskets agent runner. Your keys and state never leave the device.</p>
+      </div>
+      <div class="layer">
+        <div class="lab" style="color:#066EFF">PROTOCOL ON MIDEN</div>
+        <h3>Public market, private notes</h3>
+        <p>A public market account holds collateral and AMM odds. Position notes are private YES/NO shares; Cusp backstops liquidity.</p>
+      </div>
+      <div class="layer">
+        <div class="lab" style="color:#A300D6">MIDEN BASE</div>
+        <h3>Commitments only</h3>
+        <p>STARK proofs; the network stores only cryptographic commitments. No positions, balances or identities on-chain.</p>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:14px;margin-top:34px;padding:18px 22px;background:var(--white);border:1px solid var(--line);border-radius:8px;max-width:760px;">
+      <span class="mono" style="font-size:12px;letter-spacing:.1em;color:var(--orange);white-space:nowrap;">THE FLOW &rsaquo;</span>
+      <span style="font-size:14.5px;color:var(--gray);">Spend collateral &rarr; the market mints a YES note into your private account &rarr; public odds move, but the position is just a commitment &rarr; nobody sees who bet, which side, or how much.</span>
+    </div>
+  </div></section>
+</div>
+
+<!-- [03] CONFIDENTIAL AGENTS -->
+<div id="agents" class="band"><div class="wrap row">
+  <h2>Confidential agents</h2><span class="idx">[ 03 ]</span>
+</div></div>
+<section class="block"><div class="wrap">
+  <div class="feat">
+    <div style="display:flex;flex-direction:column;gap:18px;">
+      <p class="lead">A visible strategy is a copyable strategy.</p>
+      <p class="body">Agents trade from private accounts — their book and edge can't be copied, so an edge doesn't decay the moment it's seen. Risk runs on Miden's programmable auth: autonomous up to a size cap, human co-sign above it.</p>
+      <div style="display:flex;gap:36px;margin-top:6px;">
+        <div><div class="mono" style="font-size:28px;font-weight:500;color:var(--ink);">316</div><div class="mono" style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-top:6px;">Agents trading</div></div>
+        <div><div class="mono" style="font-size:28px;font-weight:500;color:var(--ink);">4.74M+</div><div class="mono" style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-top:6px;">Transactions</div></div>
+      </div>
+      <div style="margin-top:8px;"><a class="btn btn-primary" href="/app/">Deploy an agent &rsaquo;</a></div>
+    </div>
+    <div class="agent-vis">
+      <canvas id="agentfield"></canvas>
+      <span class="av-tag" style="top:18px;left:18px;color:var(--orange);">Private account</span>
+      <span class="av-tag" style="bottom:18px;right:18px;color:var(--muted);">0x9f3a&hellip;e201</span>
+      <div class="agent-card">
+        <div class="ac-head">
+          <div class="ac-id">
+            <span class="ac-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#A300D6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg></span>
+            <div style="min-width:0;">
+              <div class="ac-name">delta-neutral-01</div>
+              <div class="ac-strat">Delta-neutral basket</div>
+            </div>
+          </div>
+          <span class="ac-status"><span class="ac-dot"></span>TRADING</span>
+        </div>
+        <div class="ac-redact">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6E7079" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/></svg>
+          <span style="font-size:12.5px;color:var(--gray);">Strategy &amp; book</span>
+          <span class="mono" style="margin-left:auto;font-size:13px;color:var(--muted);letter-spacing:2px;">&bull;&bull;&bull;&bull;&bull;&bull;</span>
+        </div>
+        <div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+            <span class="mono" style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);">Programmable auth</span>
+            <span class="mono" style="font-size:10px;letter-spacing:.1em;color:var(--orange);border:1px solid rgba(255,85,0,.3);border-radius:999px;padding:2px 8px;">AUTONOMOUS</span>
+          </div>
+          <div class="ac-bar"><i></i></div>
+          <div class="ac-meta" style="margin-top:7px;"><span style="color:var(--ink-2);">$3,180 deployed</span><span>cap $5,000</span></div>
+        </div>
+        <div class="ac-foot">
+          <span style="font-size:12px;color:var(--muted);"><b class="mono" style="color:var(--ink-2);">14</b> markets &middot; 12d</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;"><span class="mono" style="font-size:10px;letter-spacing:.1em;color:var(--muted);">P&amp;L</span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6E7079" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/></svg><span class="mono" style="font-size:12px;color:var(--muted);letter-spacing:1px;">&bull;&bull;&bull;&bull;</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div></section>
+
+<!-- MARKETS PREVIEW -->
+<div id="markets" class="band" style="background:var(--ink);"><div class="wrap row">
+  <h2 style="color:#fff;">Live markets</h2><span class="idx" style="color:var(--orange);">[ 04 ]</span>
+</div></div>
+<section class="block" style="background:var(--ash);"><div class="wrap">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:28px;gap:20px;flex-wrap:wrap;">
+    <p class="lead" style="max-width:560px;">A market that can't watch you.</p>
+    <a class="btn btn-ghost" href="/app/" style="background:#fff;">Open all markets &rsaquo;</a>
+  </div>
+  <div class="mkts">
+    <a class="mcard" href="/app/">
+      <div style="display:flex;justify-content:space-between;align-items:center;"><span class="mcat"><span style="width:6px;height:6px;border-radius:50%;background:#066EFF;"></span>Crypto</span><span class="mono" style="font-size:11.5px;color:#16A34A;">+2.4%</span></div>
+      <h3>Will ETH close above $4,000 on Jul 31?</h3>
+      <div style="margin-top:auto;"><div class="mrow" style="margin-bottom:8px;"><span class="yes">YES 63.0%</span><span class="no">37.0% NO</span></div><div class="obar"><span class="y" style="width:63%;"></span><span class="n" style="width:37%;"></span></div></div>
+      <div class="mfoot"><span>$412k Vol</span><span>45d</span></div>
+    </a>
+    <a class="mcard" href="/app/">
+      <div style="display:flex;justify-content:space-between;align-items:center;"><span class="mcat"><span style="width:6px;height:6px;border-radius:50%;background:#FF5500;"></span>Infra</span><span class="mono" style="font-size:11.5px;color:#16A34A;">+5.1%</span></div>
+      <h3>Will Miden mainnet launch before Aug 1?</h3>
+      <div style="margin-top:auto;"><div class="mrow" style="margin-bottom:8px;"><span class="yes">YES 71.0%</span><span class="no">29.0% NO</span></div><div class="obar"><span class="y" style="width:71%;"></span><span class="n" style="width:29%;"></span></div></div>
+      <div class="mfoot"><span>$126k Vol</span><span>47d</span></div>
+    </a>
+    <a class="mcard" href="/app/">
+      <div style="display:flex;justify-content:space-between;align-items:center;"><span class="mcat"><span style="width:6px;height:6px;border-radius:50%;background:#A300D6;"></span>Macro</span><span class="mono" style="font-size:11.5px;color:#E5484D;">-1.8%</span></div>
+      <h3>Will the Fed cut rates in September?</h3>
+      <div style="margin-top:auto;"><div class="mrow" style="margin-bottom:8px;"><span class="yes">YES 45.0%</span><span class="no">55.0% NO</span></div><div class="obar"><span class="y" style="width:45%;"></span><span class="n" style="width:55%;"></span></div></div>
+      <div class="mfoot"><span>$908k Vol</span><span>93d</span></div>
+    </a>
+  </div>
+</div></section>
+
+<!-- CTA -->
+<div class="cta"><div class="inner">
+  <div class="glow"></div>
+  <div style="position:relative;">
+    <span class="eyebrow">Coming to Miden · mainnet ~July 2026</span>
+    <h2 style="margin-top:18px;">Private positions.<br><span class="o">Public odds.</span></h2>
+    <p>Confidential markets. Confidential agents. Your edge stays yours.</p>
+    <div style="display:flex;gap:12px;justify-content:center;margin-top:30px;">
+      <a class="btn btn-primary btn-lg" href="/app/">Launch app &rsaquo;</a>
+      <a class="btn btn-lg" href="#top" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,.25);">Read the brief</a>
+    </div>
+  </div>
+</div></div>
+
+<!-- FOOTER -->
+<footer><div class="wrap row">
+  <div style="display:flex;align-items:center;gap:16px;">
+    <img src="/logo/obscura-wordmark-dark.svg" alt="Obscura" height="22">
+  </div>
+  <div class="links">
+    <a href="#unlock">Product</a><a href="#how">How it works</a><a href="#agents">Agents</a><a href="/app/">Launch app</a>
+  </div>
+  <span class="builton">PRIVATE POSITIONS · PUBLIC ODDS · ON MIDEN</span>
+</div></footer>
+
+<script>
+(function(){
+  // ---- halftone / network hero graphic (brand texture) ----
+  var c = document.getElementById('halftone');
+  function draw(){
+    var dpr = Math.min(2, window.devicePixelRatio||1);
+    var w = c.clientWidth, h = c.clientHeight;
+    if(!w||!h) return;
+    c.width = w*dpr; c.height = h*dpr;
+    var ctx = c.getContext('2d');
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.clearRect(0,0,w,h);
+    // halftone dot field — density rises toward lower-right "mass"
+    var step = 7;
+    for(var y=0;y<h;y+=step){
+      for(var x=0;x<w;x+=step){
+        var nx=x/w, ny=y/h;
+        var f = nx*0.55 + ny*0.75;
+        f += 0.20*Math.sin(nx*13+ny*8)*Math.cos(ny*10-nx*5);
+        f += 0.10*Math.sin(nx*31+ny*19);
+        f = Math.max(0, Math.min(1, f));
+        var r = f*f*2.9*(0.65+Math.random()*0.6);
+        if(r>0.35){
+          ctx.globalAlpha = 0.30 + f*0.6;
+          ctx.beginPath();
+          ctx.arc(x,y,Math.min(3.0,r),0,6.2832);
+          ctx.fillStyle='#FF5500';
+          ctx.fill();
+        }
+      }
+    }
+    // triangulated network in the upper region
+    var pts=[];
+    for(var i=0;i<16;i++) pts.push([Math.random()*w, Math.random()*h*0.62]);
+    ctx.strokeStyle='#FF5500'; ctx.lineWidth=0.6;
+    for(var i=0;i<pts.length;i++){
+      var ds=[];
+      for(var j=0;j<pts.length;j++){ if(j!==i){ var dx=pts[j][0]-pts[i][0],dy=pts[j][1]-pts[i][1]; ds.push([j,Math.sqrt(dx*dx+dy*dy)]); } }
+      ds.sort(function(a,b){return a[1]-b[1];});
+      for(var k=0;k<2;k++){ var j=ds[k][0]; ctx.globalAlpha=0.45; ctx.beginPath(); ctx.moveTo(pts[i][0],pts[i][1]); ctx.lineTo(pts[j][0],pts[j][1]); ctx.stroke(); }
+    }
+    for(var i=0;i<pts.length;i++){ ctx.globalAlpha=0.9; ctx.beginPath(); ctx.arc(pts[i][0],pts[i][1],1.7,0,6.2832); ctx.fillStyle='#FF5500'; ctx.fill(); }
+    ctx.globalAlpha=1;
+  }
+  draw();
+
+  // ---- agent halftone field (denser at edges so the card reads) ----
+  var ac = document.getElementById('agentfield');
+  function adraw(){
+    if(!ac) return;
+    var dpr = Math.min(2, window.devicePixelRatio||1);
+    var w = ac.clientWidth, h = ac.clientHeight; if(!w||!h) return;
+    ac.width = w*dpr; ac.height = h*dpr;
+    var x = ac.getContext('2d'); x.setTransform(dpr,0,0,dpr,0,0);
+    x.clearRect(0,0,w,h);
+    var step=8;
+    for(var yy=0;yy<h;yy+=step){ for(var xx=0;xx<w;xx+=step){
+      var nx=xx/w, ny=yy/h;
+      var dcc=Math.sqrt((nx-0.5)*(nx-0.5)+(ny-0.52)*(ny-0.52));
+      var f=Math.min(1,Math.max(0, dcc*1.5 - 0.18));
+      f *= (0.6 + 0.4*Math.sin(nx*17+ny*12));
+      var r=f*2.3*(0.6+Math.random()*0.6);
+      if(r>0.42){ x.globalAlpha=0.16+f*0.42; x.beginPath(); x.arc(xx,yy,Math.min(2.3,r),0,6.2832); x.fillStyle='#FF5500'; x.fill(); }
+    }}
+    x.globalAlpha=1;
+  }
+  adraw();
+
+  var rt; window.addEventListener('resize', function(){ clearTimeout(rt); rt=setTimeout(function(){ draw(); adraw(); },150); });
+
+  // ---- faint code texture behind "how it works" ----
+  var code = [
+    'pragma miden ^1.0; account Market { pub odds: Felt; pub pool: Felt;',
+    'note Position { side: Bool; size: Felt; owner: Commitment; } // private',
+    'fn place(side, size) external { let note = mint(side, size);',
+    '  commit(hash(note)); odds = amm.update(side, size); } // only commitment on-chain',
+    'STARK prove(tx) -> proof; network.verify(proof); // no balances revealed',
+    'oracle Pragma.resolve(market) -> outcome; redeem(note) if win; // private redeem',
+    'agent.cap = 5000; agent.auth = autonomous_below(cap) else cosign;',
+    'commitment 0x9f3a…e201  note 0x7b3f…c0de  holder=hidden  side=hidden  size=hidden'
+  ];
+  var tex = document.getElementById('codetex');
+  if(tex){ var out=''; for(var i=0;i<10;i++){ out += code[i%code.length] + '\n'; } tex.textContent = out; }
+})();
+</script>
+</body>
 </html>
