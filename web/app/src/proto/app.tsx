@@ -29,6 +29,8 @@ const SLOT_RES = "miden_market::market::resolution";
 // once their accounts are deployed + seeded.
 const LIVE_MARKETS = {
   "miden-mainnet": MARKET_ID_HEX,
+  "eth-4k": "0x612f7f710da01a10116a1ca76afac5", // seeded 63% YES
+  "fed-sep": "0x60de1a3b8cf5cb10384598e50506cf", // seeded 45% YES
 };
 
 const wordToBig = (w) => { try { return w ? w.toU64s()[0] : 0n; } catch (e) { return 0n; } };
