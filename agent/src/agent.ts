@@ -29,10 +29,21 @@ async function tick(): Promise<void> {
     const tx = await placeAutonomous(d.side);
     console.log(`[auto]   submitted ${tx}`);
   } else {
-    console.log(`[cosign] ${d.size} > cap ${AUTONOMOUS_CAP} → human co-sign via Guardian`);
+    console.log(`[cosign] ${d.size} > cap ${AUTONOMOUS_CAP} → human co-sign REQUIRED (programmable-auth guardrail)`);
+    const multisig = process.env.SUBROSA_MULTISIG;
+    if (!multisig) {
+      console.log(
+        "[cosign] Guardian not configured here. With a self-hosted Guardian + SUBROSA_MULTISIG set,",
+      );
+      console.log(
+        "[cosign] this routes a 2-of-N proposal for human co-sign (browser, web SDK is browser-only — see docs/GUARDIAN.md).",
+      );
+      return;
+    }
+    // guardian.ts pulls the browser web SDK (WASM) — only loads in a browser.
     const { proposeAndCoSign } = await import("./guardian.js");
     const r = await proposeAndCoSign({
-      multisigAccountId: process.env.SUBROSA_MULTISIG ?? "",
+      multisigAccountId: multisig,
       recipientHex: AGENT_ACCOUNT_HEX,
       amount: d.size,
     });

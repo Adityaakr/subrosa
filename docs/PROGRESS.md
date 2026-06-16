@@ -238,12 +238,25 @@ compiles against the real Guardian/SDK API surface.
 + a human co-signer for the above-cap path; the `FalconSigner`/`AuthSecretKey`
 constructor at runtime; the autonomous path against a funded agent account.
 
-**One-command co-sign:** `agent` ships `npm run cosign` (`src/cosign-demo.ts`) —
-stand up self-hosted Guardian (`npm run guardian:up`), then `npm run cosign`
-creates a 2-of-2 multisig, proposes, signs with both parties, and **executes a
-real on-chain multisig tx** (verify on the explorer). Typechecks against the
-real OZ SDK; the live run needs the Guardian docker server (runbook in
-`GUARDIAN.md`).
+### Agent execution — RUN & verified on-chain ✅
+`SUBROSA_MARKET=0x5ff0303f… npm start -- --once`:
+- read live odds (yes=1250 no=1100) → decided "YES underpriced @ 46.8%" →
+  150 ≤ cap 500 → **autonomous on-chain trade**: tx
+  `0xb4b6c677c0f1c3b5d486e125bb0443d47a49b7c2502f5face9d3fadfcac13a94`
+  (committed @ block 1643868; `yes_reserve` 1250→1500, vol 350→600).
+- with `SUBROSA_CAP=100`: decided 400 → **400 > cap → "human co-sign REQUIRED
+  (programmable-auth guardrail)"** → routes to the Guardian path. The cap routing
+  is real; the actual co-sign execution needs Guardian (below).
+(`agent.ts` lazy-imports guardian so the autonomous + routing paths run in Node;
+the web SDK WASM is browser-only.)
+
+### Guardian co-sign execution — gated on the user's machine
+`npm run cosign` (`src/cosign-demo.ts`) is written + typechecks against the real
+OZ SDK, but a real on-chain co-sign hash needs **(a)** a running Docker daemon +
+self-hosted Guardian and **(b)** a browser (the `@miden-sdk` WASM is browser-only
+— it does not load in Node). Cannot be produced from this CLI environment;
+runnable by the user (or via a browser co-sign page — see PLAN open items).
+Runbook: `GUARDIAN.md`.
 ## Phase 5 — Demo + tutorial  ✅ (Cusp LP layer ☐)
 
 The DevRel artifact — grounded entirely in verified, on-chain evidence:
