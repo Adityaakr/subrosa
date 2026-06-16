@@ -7,6 +7,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "start": "tsx src/agent.ts",
+    "cosign": "tsx src/cosign-demo.ts",
     "guardian:up": "docker compose -f docker/guardian-compose.yml up --build -d",
     "guardian:down": "docker compose -f docker/guardian-compose.yml down"
   },
