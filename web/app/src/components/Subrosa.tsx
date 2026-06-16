@@ -221,6 +221,10 @@ function PrivacySeal({ pos }: { pos: Position }) {
         no holder, no side, no size.
       </p>
       <code className="sr-seal-acct mono">private acct {short(pos.account)} · commitment only</code>
+      <p className="sr-seal-text" style={{ marginBottom: 0 }}>
+        Settle the public odds on-chain (operator step):
+      </p>
+      <code className="sr-seal-acct mono">scripts/operator.sh {pos.side}</code>
     </div>
   );
 }
