@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React from "react";
-import { useCreateWallet, useTransaction, useAccount, useConsume, useSyncState, useNotes, formatAssetAmount } from "@miden-sdk/react";
+import { useCreateWallet, useTransaction, useAccount, useAccounts, useConsume, useSyncState, useNotes, formatAssetAmount, accountIdsEqual } from "@miden-sdk/react";
 import {
   AccountId, Package, NoteScript, Note, NoteAssets, NoteMetadata,
   NoteRecipient, NoteStorage, NoteTag, NoteType, NoteArray, FeltArray, TransactionRequestBuilder,
@@ -19,58 +19,81 @@ const shortHex = (s) => (s && s.length > 14 ? `${s.slice(0, 8)}…${s.slice(-4)}
    mint test OBX so the balance is genuinely non-zero. */
 function useWallet() {
   const { createWallet } = useCreateWallet();
-  const [walletId, setWalletId] = React.useState(() => {
-    try { return localStorage.getItem(WALLET_LS); } catch (e) { return null; }
-  });
-  const [connecting, setConnecting] = React.useState(false);
-  const [funding, setFunding] = React.useState(false);
-  const acctRef = React.useRef(null);
+  const { accounts, wallets, isLoading: listLoading } = useAccounts();
   const { consume } = useConsume();
   const { sync } = useSyncState();
   const notes = useNotes();
   const notesRef = React.useRef([]);
   React.useEffect(() => { notesRef.current = notes.consumableNotes || []; }, [notes.consumableNotes]);
-  const q = useAccount(walletId ?? undefined);
-  React.useEffect(() => { if (q.account) acctRef.current = q.account; }, [q.account]);
-  // If a persisted id is no longer in the local store, reset rather than get
-  // stuck "connected" with no account.
-  React.useEffect(() => {
-    if (walletId && q && q.isLoading === false && !q.account) {
-      acctRef.current = null;
-      try { localStorage.removeItem(WALLET_LS); } catch (e) {}
-      setWalletId(null);
-    }
-  }, [walletId, q.isLoading, q.account]);
 
+  const idOf = (a) => { try { return (a && a.id ? a.id() : a)?.toString?.() ?? String(a); } catch (e) { return String(a); } };
+  const sameId = (a, id) => { if (!a || !id) return false; try { return accountIdsEqual(a, id); } catch (e) { return idOf(a) === id; } };
+
+  // every wallet this client has in its local store
+  const list = React.useMemo(() => [...(wallets || []), ...(accounts || [])].filter(Boolean), [wallets, accounts]);
+
+  const [walletId, setWalletId] = React.useState(() => {
+    try { return localStorage.getItem(WALLET_LS); } catch (e) { return null; }
+  });
+  const [connecting, setConnecting] = React.useState(false);
+  const [funding, setFunding] = React.useState(false);
+  const [error, setError] = React.useState(null);
+
+  // Resolve the connected account OBJECT from the store by its persisted id —
+  // far more reliable than re-deriving it from a string each render.
+  const stored = React.useMemo(() => (walletId ? list.find((a) => sameId(a, walletId)) || null : null), [walletId, list]);
+  const acctRef = React.useRef(null);
+  React.useEffect(() => { if (stored) acctRef.current = stored; }, [stored]);
+  const account = stored || acctRef.current;
+
+  const q = useAccount(account ?? walletId ?? undefined);
   let balance = 0n;
   try { if (q.getBalance) balance = q.getBalance(OBX_FAUCET_HEX) ?? 0n; } catch (e) {}
 
+  // Once the store list has loaded, drop a persisted id that no longer exists
+  // (e.g. the IndexedDB was reset) — but never wipe a freshly created wallet.
+  React.useEffect(() => {
+    if (walletId && !listLoading && !stored && !acctRef.current) {
+      try { localStorage.removeItem(WALLET_LS); } catch (e) {}
+      setWalletId(null);
+    }
+  }, [walletId, listLoading, stored]);
+
+  const address = account ? idOf(account) : walletId;
+
   const connect = async () => {
-    if (acctRef.current) return acctRef.current;
-    if (walletId && q.account) { acctRef.current = q.account; return q.account; }
-    if (walletId && !q.account) throw new Error("wallet still loading — try again in a moment");
+    setError(null);
+    if (account) return account;
     setConnecting(true);
     try {
-      const w = await createWallet({ storageMode: "private" });
+      // adopt an existing wallet from the store, else create a fresh one
+      let w = (wallets && wallets[0]) || (accounts && accounts[0]) || null;
+      if (!w) w = await createWallet({ storageMode: "private" });
       acctRef.current = w;
-      const id = w.id().toString();
-      try { localStorage.setItem(WALLET_LS, id); } catch (e) {}
-      setWalletId(id);
+      try { localStorage.setItem(WALLET_LS, idOf(w)); } catch (e) {}
+      setWalletId(idOf(w));
       return w;
+    } catch (e) {
+      setError(e?.message || String(e));
+      console.error("[wallet] connect failed:", e);
+      throw e;
     } finally { setConnecting(false); }
   };
+
   const disconnect = () => {
     acctRef.current = null;
     try { localStorage.removeItem(WALLET_LS); } catch (e) {}
     setWalletId(null);
   };
+
   // Ask the operator faucet to mint OBX to this wallet, then sync + consume the
   // minted note so the live balance actually reflects the credit.
   const fund = async () => {
-    if (!walletId || funding) return;
+    const id = address;
+    if (!id || funding) return;
     setFunding(true);
     try {
-      const r = await fetch(FUND_ENDPOINT, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ address: walletId }) });
+      const r = await fetch(FUND_ENDPOINT, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ address: id }) });
       if (!r.ok) throw new Error("fund endpoint returned " + r.status);
       for (let i = 0; i < 10; i++) {
         await new Promise((res) => setTimeout(res, 3000));
@@ -78,7 +101,7 @@ function useWallet() {
         try { await notes.refetch?.(); } catch (e) {}
         const cn = notesRef.current || [];
         if (cn.length) {
-          try { await consume({ accountId: walletId, notes: cn }); } catch (e) { console.warn("[fund] consume failed:", e); }
+          try { await consume({ accountId: id, notes: cn }); } catch (e) { console.warn("[fund] consume failed:", e); }
           break;
         }
       }
@@ -89,8 +112,8 @@ function useWallet() {
   };
 
   return {
-    connected: !!walletId, connecting, funding, walletId,
-    account: acctRef.current,
+    connected: !!account || !!walletId, connecting, funding, error,
+    walletId: address, account,
     balance, balanceLabel: formatAssetAmount(balance, 8),
     connect, disconnect, fund, refetch: q.refetch,
   };

@@ -206,10 +206,13 @@ function TopBar({ left, wallet }) {
           <span className="mono" style={{ marginLeft: "auto", fontSize: 10.5, color: "var(--faint)", border: "1px solid var(--hair-2)", borderRadius: 5, padding: "1px 5px" }}>/</span>
         </div>
         {!w.connected ? (
-          <button onClick={() => w.connect && w.connect()} disabled={w.connecting} style={{ display: "flex", alignItems: "center", gap: 8, height: 36, padding: "0 16px", borderRadius: "var(--r-md)", border: "none", background: "var(--accent)", color: "#fff", fontWeight: 600, fontSize: 13.5, cursor: w.connecting ? "default" : "pointer", opacity: w.connecting ? 0.7 : 1 }}>
-            <window.Icon name="wallet" size={15} color="#fff" />
-            {w.connecting ? "Connecting…" : "Connect wallet"}
-          </button>
+          <>
+            {w.error ? <span className="mono" title={w.error} style={{ fontSize: 11, color: "var(--no)", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{w.error}</span> : null}
+            <button onClick={() => w.connect && w.connect()} disabled={w.connecting} style={{ display: "flex", alignItems: "center", gap: 8, height: 36, padding: "0 16px", borderRadius: "var(--r-md)", border: "none", background: "var(--accent)", color: "#fff", fontWeight: 600, fontSize: 13.5, cursor: w.connecting ? "default" : "pointer", opacity: w.connecting ? 0.7 : 1 }}>
+              <window.Icon name="wallet" size={15} color="#fff" />
+              {w.connecting ? "Connecting…" : "Connect wallet"}
+            </button>
+          </>
         ) : (
           <>
             <div title="Live OBX balance on testnet" style={{ display: "flex", alignItems: "center", gap: 8, height: 36, padding: "0 12px", borderRadius: "var(--r-md)", border: "1px solid var(--hair)", background: "var(--surface)" }}>
