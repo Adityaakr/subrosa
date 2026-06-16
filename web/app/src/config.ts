@@ -2,10 +2,13 @@
 
 export const APP_NAME = "Subrosa";
 
-// Miden SDK — testnet RPC; prove LOCALLY (in-browser) by default.
+// Miden SDK — testnet RPC. Proving is DELEGATED to the testnet prover by
+// default: keys, execution and private state stay in the browser; only the
+// heavy STARK proof generation is offloaded (fully-local in-browser proving is
+// available via VITE_MIDEN_PROVER=local but is very CPU-heavy and can stall).
 export const MIDEN_RPC_URL = import.meta.env.VITE_MIDEN_RPC_URL ?? "testnet";
 export const MIDEN_PROVER =
-  (import.meta.env.VITE_MIDEN_PROVER as "local" | "testnet" | "devnet") ?? "local";
+  (import.meta.env.VITE_MIDEN_PROVER as "local" | "testnet" | "devnet") ?? "testnet";
 
 export const EXPLORER_BASE_URL = "https://testnet.midenscan.com";
 

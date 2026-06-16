@@ -171,7 +171,7 @@ export function Subrosa() {
                 <b>{payout(Number(amount) || 0, side, yesPctFor(selected))} OBX</b>
               </div>
               <button className="sr-place" disabled={placing || isCreating} onClick={placePrivatePosition}>
-                {placing || isCreating ? "Proving in browser…" : "Place private position"}
+                {placing || isCreating ? "Submitting on-chain…" : "Place private position"}
               </button>
               {placeErr && <p className="sr-err">{placeErr}</p>}
             </div>
@@ -263,9 +263,9 @@ function PrivacySeal({ pos }: { pos: Position }) {
         <span className="mono">position recorded</span>
       </div>
       <p className="sr-seal-text">
-        Your {pos.side.toUpperCase()} position of {pos.amount} OBX was placed from a private account,
-        proved locally in your browser and <b>submitted on-chain</b>. The network records{" "}
-        <b>only a commitment</b> — no holder, no side, no size.
+        Your {pos.side.toUpperCase()} position of {pos.amount} OBX was placed from a private account
+        (signed locally in your browser; proving delegated to the testnet prover) and{" "}
+        <b>submitted on-chain</b>. The network records <b>only a commitment</b> — no holder, no side, no size.
       </p>
       {pos.tx && (
         <a
