@@ -188,10 +188,10 @@
 <!-- STATS -->
 <div class="stats" style="margin-top:64px;">
   <div class="wrap"><div class="row">
-    <div class="stat"><div class="v">4.74M+</div><div class="l">Agent transactions</div></div>
-    <div class="stat"><div class="v">316</div><div class="l">Live confidential agents</div></div>
-    <div class="stat"><div class="v">$500k+</div><div class="l">Volume traded</div></div>
+    <div class="stat"><div class="v">Public</div><div class="l">Odds, prices &amp; resolution</div></div>
+    <div class="stat"><div class="v">Private</div><div class="l">Your side, size &amp; P&amp;L</div></div>
     <div class="stat"><div class="v">0</div><div class="l">Positions visible on-chain</div></div>
+    <div class="stat"><div class="v">Miden</div><div class="l">Built on testnet</div></div>
   </div></div>
 </div>
 
@@ -225,12 +225,12 @@
       <div class="layer">
         <div class="lab" style="color:var(--orange)">CLIENT</div>
         <h3>In-browser proving</h3>
-        <p>A web app with client-side execution and the Polybaskets agent runner. Your keys and state never leave the device.</p>
+        <p>A web app with client-side execution and STARK proving — plus a confidential agent runner. Your keys and state never leave the device.</p>
       </div>
       <div class="layer">
         <div class="lab" style="color:#066EFF">PROTOCOL ON MIDEN</div>
         <h3>Public market, private notes</h3>
-        <p>A public market account holds collateral and AMM odds. Position notes are private YES/NO shares; Cusp backstops liquidity.</p>
+        <p>A public market account holds collateral and AMM odds. Position notes are private YES/NO shares; a constant-product (CPMM) curve keeps the odds liquid.</p>
       </div>
       <div class="layer">
         <div class="lab" style="color:#A300D6">MIDEN BASE</div>
@@ -255,8 +255,8 @@
       <p class="lead">A visible strategy is a copyable strategy.</p>
       <p class="body">Agents trade from private accounts — their book and edge can't be copied, so an edge doesn't decay the moment it's seen. Risk runs on Miden's programmable auth: autonomous up to a size cap, human co-sign above it.</p>
       <div style="display:flex;gap:36px;margin-top:6px;">
-        <div><div class="mono" style="font-size:28px;font-weight:500;color:var(--ink);">316</div><div class="mono" style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-top:6px;">Agents trading</div></div>
-        <div><div class="mono" style="font-size:28px;font-weight:500;color:var(--ink);">4.74M+</div><div class="mono" style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-top:6px;">Transactions</div></div>
+        <div><div class="mono" style="font-size:28px;font-weight:500;color:var(--ink);">0</div><div class="mono" style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-top:6px;">Strategy bytes on-chain</div></div>
+        <div><div class="mono" style="font-size:28px;font-weight:500;color:var(--ink);">2-of-N</div><div class="mono" style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-top:6px;">Guardian co-sign above cap</div></div>
       </div>
       <div style="margin-top:8px;"><a class="btn btn-primary" href="prototypes/obscura/index.html">Deploy an agent &rsaquo;</a></div>
     </div>

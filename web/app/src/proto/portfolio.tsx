@@ -177,7 +177,7 @@ function AgentsScreen() {
           <SummaryCard label="Active agents" value={String(activeN)} sub={`of ${A.length} deployed`} />
           <SummaryCard label="Combined cap" value={window.fmtUsd(cap)} glow />
           <SummaryCard label="Capital deployed" value={window.fmtUsd(dep)} sub={`${Math.round((dep / cap) * 100)}% of cap`} />
-          <SummaryCard label="Network agents" value="316" sub="trading confidentially" />
+          <SummaryCard label="Strategies exposed" value="0" sub="agent edge stays private" />
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>

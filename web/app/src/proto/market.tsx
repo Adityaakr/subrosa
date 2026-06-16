@@ -87,7 +87,7 @@ function MarketsHome({ onOpen }) {
             <p style={{ fontSize: 15.5, color: "var(--muted)", margin: 0, maxWidth: 540 }}>Public, trustworthy odds — your position, size and P&amp;L stay private. Only a commitment is recorded on-chain.</p>
           </div>
           <div style={{ position: "relative", zIndex: 1, display: "flex", gap: 30, paddingBottom: 4 }}>
-            {[["Markets", "48"], ["24h volume", "$3.1M"], ["Live agents", "316"]].map(([l, v]) => (
+            {[["Markets", String(window.OBS.markets.length)], ["Odds", "Public"], ["Positions", "Private"]].map(([l, v]) => (
               <div key={l}>
                 <div className="mono" style={{ fontSize: 24, fontWeight: 500, color: "var(--text)", letterSpacing: "-0.01em" }}>{v}</div>
                 <div className="tag" style={{ color: "var(--faint)", marginTop: 4 }}>{l}</div>
