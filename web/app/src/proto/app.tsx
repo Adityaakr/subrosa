@@ -148,12 +148,19 @@ function useWallet() {
       setFundMsg("Minting 1,000 OBX…");
       await wasmRetry(() => mint({ targetAccountId: id, faucetId: fid, amount: parseAssetAmount("1000", FUND_DECIMALS), noteType: "private" }));
       setFundMsg("Claiming…");
+      // Only consume notes carrying OUR faucet's asset. A wallet may hold stale
+      // notes from earlier attempts (e.g. a CLI-minted note) that the web client
+      // can't execute — sweeping those into the batch fails the whole consume.
+      const isOurs = (s) => (s.assets || []).some((a) => {
+        try { return accountIdsEqual(a.assetId, fid); }
+        catch (e) { return String(a.assetId || "").toLowerCase() === String(fid).toLowerCase(); }
+      });
       let claimed = false;
       for (let i = 0; i < 12; i++) {
         await new Promise((res) => setTimeout(res, 2500));
         try { await wasmRetry(() => sync()); } catch (e) {}
         try { await notes.refetch?.(); } catch (e) {}
-        const ids = (notesRef.current || []).map((s) => s.id).filter(Boolean);
+        const ids = (notesRef.current || []).filter(isOurs).map((s) => s.id).filter(Boolean);
         if (ids.length) {
           await wasmRetry(() => consume({ accountId: id, notes: ids }));
           claimed = true;
