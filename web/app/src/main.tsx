@@ -14,10 +14,18 @@ import "./proto/seal.tsx";
 import "./proto/portfolio.tsx";
 import App from "./proto/app.tsx";
 
+// In dev, route RPC + delegated proving + note transport through the Vite
+// same-origin proxy (see vite.config.ts) to dodge the cross-origin COEP/CORS
+// wall. In a real deploy, set these to your own reverse-proxied paths.
+const ORIGIN = typeof window !== "undefined" ? window.location.origin : "";
+const midenConfig = import.meta.env.DEV
+  ? { rpcUrl: `${ORIGIN}/miden-rpc`, prover: `${ORIGIN}/miden-prover`, noteTransportUrl: `${ORIGIN}/miden-transport` }
+  : { rpcUrl: MIDEN_RPC_URL, prover: MIDEN_PROVER };
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <MidenProvider
-      config={{ rpcUrl: MIDEN_RPC_URL, prover: MIDEN_PROVER }}
+      config={midenConfig}
       loadingComponent={<div className="backdrop" />}
     >
       <div className="backdrop" />
