@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useMiden, useMidenClient } from "@miden-sdk/react";
+import { useMiden } from "@miden-sdk/react";
 import { AccountId } from "@miden-sdk/miden-sdk";
 import { MARKET_ID_HEX, SLOT_YES, SLOT_NO, SLOT_VOL, SLOT_RES } from "@/config";
 
@@ -14,8 +14,9 @@ export type MarketState = {
 // the testnet node. Mirrors the verified read pattern: import → sync → getAccount
 // → storage().getItem(slot). All WASM calls serialized via runExclusive.
 export function useMarket() {
-  const { isReady, runExclusive } = useMiden();
-  const client = useMidenClient();
+  // Use the nullable `client` from useMiden() (not useMidenClient(), which
+  // THROWS before the client is ready) so this hook is safe to call during init.
+  const { isReady, runExclusive, client } = useMiden();
   const [state, setState] = useState<MarketState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
