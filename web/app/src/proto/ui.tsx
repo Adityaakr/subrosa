@@ -191,7 +191,10 @@ function ThemeToggle() {
 }
 
 /* ---------- top bar ---------- */
-function TopBar({ left, balance }) {
+function shortId(s) { return s && s.length > 12 ? `${s.slice(0, 6)}…${s.slice(-4)}` : (s || ""); }
+
+function TopBar({ left, wallet }) {
+  const w = wallet || {};
   return (
     <header style={{ position: "sticky", top: 0, zIndex: 5, display: "flex", alignItems: "center", gap: 16, height: 60, padding: "0 28px", borderBottom: "1px solid var(--hair)", background: "var(--glass)", backdropFilter: "blur(14px)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>{left}</div>
@@ -202,16 +205,28 @@ function TopBar({ left, balance }) {
           <span style={{ fontSize: 13, color: "var(--faint)" }}>Search markets</span>
           <span className="mono" style={{ marginLeft: "auto", fontSize: 10.5, color: "var(--faint)", border: "1px solid var(--hair-2)", borderRadius: 5, padding: "1px 5px" }}>/</span>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, height: 36, padding: "0 12px", borderRadius: "var(--r-md)", border: "1px solid var(--hair)", background: "var(--surface)" }}>
-          <window.Icon name="wallet" size={15} color="var(--accent)" />
-          <span className="mono" style={{ fontSize: 13, color: "var(--text)", fontWeight: 500 }}>{fmtUsd(balance)}</span>
-          <span className="mono" style={{ fontSize: 11, color: "var(--faint)" }}>USDC</span>
-        </div>
-        <button style={{ display: "flex", alignItems: "center", gap: 8, height: 36, padding: "0 10px 0 12px", borderRadius: "var(--r-md)", border: "1px solid var(--hair-2)", background: "var(--surface-2)", color: "var(--text)", cursor: "pointer" }}>
-          <span style={{ width: 18, height: 18, borderRadius: "50%", background: "linear-gradient(135deg,#FF5500,#A300D6)" }} />
-          <span className="mono" style={{ fontSize: 12.5 }}>0x9f3a…e201</span>
-          <window.Icon name="chevron-down" size={14} color="var(--faint)" />
-        </button>
+        {!w.connected ? (
+          <button onClick={() => w.connect && w.connect()} disabled={w.connecting} style={{ display: "flex", alignItems: "center", gap: 8, height: 36, padding: "0 16px", borderRadius: "var(--r-md)", border: "none", background: "var(--accent)", color: "#fff", fontWeight: 600, fontSize: 13.5, cursor: w.connecting ? "default" : "pointer", opacity: w.connecting ? 0.7 : 1 }}>
+            <window.Icon name="wallet" size={15} color="#fff" />
+            {w.connecting ? "Connecting…" : "Connect wallet"}
+          </button>
+        ) : (
+          <>
+            <div title="Live OBX balance on testnet" style={{ display: "flex", alignItems: "center", gap: 8, height: 36, padding: "0 12px", borderRadius: "var(--r-md)", border: "1px solid var(--hair)", background: "var(--surface)" }}>
+              <window.Icon name="wallet" size={15} color="var(--accent)" />
+              <span className="mono" style={{ fontSize: 13, color: "var(--text)", fontWeight: 500 }}>{w.balanceLabel ?? "0"}</span>
+              <span className="mono" style={{ fontSize: 11, color: "var(--faint)" }}>OBX</span>
+            </div>
+            <button onClick={() => w.fund && w.fund()} title="Request test OBX from the faucet" style={{ display: "flex", alignItems: "center", gap: 6, height: 36, padding: "0 12px", borderRadius: "var(--r-md)", border: "1px solid var(--hair-2)", background: "var(--surface-2)", color: "var(--text)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>
+              <window.Icon name="plus" size={14} color="var(--accent)" /> Fund
+            </button>
+            <button onClick={() => w.disconnect && w.disconnect()} title="Disconnect" style={{ display: "flex", alignItems: "center", gap: 8, height: 36, padding: "0 10px 0 12px", borderRadius: "var(--r-md)", border: "1px solid var(--hair-2)", background: "var(--surface-2)", color: "var(--text)", cursor: "pointer" }}>
+              <span style={{ width: 18, height: 18, borderRadius: "50%", background: "linear-gradient(135deg,#FF5500,#A300D6)" }} />
+              <span className="mono" style={{ fontSize: 12.5 }}>{shortId(w.walletId)}</span>
+              <window.Icon name="chevron-down" size={14} color="var(--faint)" />
+            </button>
+          </>
+        )}
       </div>
     </header>
   );

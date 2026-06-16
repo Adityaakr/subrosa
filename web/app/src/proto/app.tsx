@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React from "react";
-import { useCreateWallet, useTransaction } from "@miden-sdk/react";
+import { useCreateWallet, useTransaction, useAccount, formatAssetAmount } from "@miden-sdk/react";
 import {
   AccountId, Package, NoteScript, Note, NoteAssets, NoteMetadata,
   NoteRecipient, NoteStorage, NoteTag, NoteType, NoteArray, FeltArray, TransactionRequestBuilder,
@@ -8,7 +8,71 @@ import {
 import { randomWord } from "../lib/miden";
 
 const MARKET_ID_HEX = "0x5ff0303f0b795d1039ca5b51d8480b";
+const OBX_FAUCET_HEX = "0x1201d9f8819d5220778535e4e2f08a";
+const FUND_ENDPOINT = import.meta.env.VITE_FUND_ENDPOINT ?? "http://localhost:8787/fund";
+const WALLET_LS = "subrosa.wallet.id";
 const shortHex = (s) => (s && s.length > 14 ? `${s.slice(0, 8)}…${s.slice(-4)}` : s);
+
+/* Real built-in browser wallet: a persisted private testnet account whose ID +
+   live OBX balance come straight from the SDK. connect() creates one on first
+   use (or reuses the persisted one); fund() asks the operator faucet service to
+   mint test OBX so the balance is genuinely non-zero. */
+function useWallet() {
+  const { createWallet } = useCreateWallet();
+  const [walletId, setWalletId] = React.useState(() => {
+    try { return localStorage.getItem(WALLET_LS); } catch (e) { return null; }
+  });
+  const [connecting, setConnecting] = React.useState(false);
+  const acctRef = React.useRef(null);
+  const q = useAccount(walletId ?? undefined);
+  React.useEffect(() => { if (q.account) acctRef.current = q.account; }, [q.account]);
+  // If a persisted id is no longer in the local store, reset rather than get
+  // stuck "connected" with no account.
+  React.useEffect(() => {
+    if (walletId && q && q.isLoading === false && !q.account) {
+      acctRef.current = null;
+      try { localStorage.removeItem(WALLET_LS); } catch (e) {}
+      setWalletId(null);
+    }
+  }, [walletId, q.isLoading, q.account]);
+
+  let balance = 0n;
+  try { if (q.getBalance) balance = q.getBalance(OBX_FAUCET_HEX) ?? 0n; } catch (e) {}
+
+  const connect = async () => {
+    if (acctRef.current) return acctRef.current;
+    if (walletId && q.account) { acctRef.current = q.account; return q.account; }
+    if (walletId && !q.account) throw new Error("wallet still loading — try again in a moment");
+    setConnecting(true);
+    try {
+      const w = await createWallet({ storageMode: "private" });
+      acctRef.current = w;
+      const id = w.id().toString();
+      try { localStorage.setItem(WALLET_LS, id); } catch (e) {}
+      setWalletId(id);
+      return w;
+    } finally { setConnecting(false); }
+  };
+  const disconnect = () => {
+    acctRef.current = null;
+    try { localStorage.removeItem(WALLET_LS); } catch (e) {}
+    setWalletId(null);
+  };
+  const fund = async () => {
+    if (!walletId) return;
+    try {
+      await fetch(FUND_ENDPOINT, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ address: walletId }) });
+      setTimeout(() => q.refetch && q.refetch(), 1500);
+    } catch (e) { console.warn("[fund] failed — is the operator faucet service running?", e); }
+  };
+
+  return {
+    connected: !!walletId, connecting, walletId,
+    account: acctRef.current,
+    balance, balanceLabel: formatAssetAmount(balance, 8),
+    connect, disconnect, fund, refetch: q.refetch,
+  };
+}
 
 /* Subrosa prototype — root app: routing, state, seal flow.
    The seal UX is the design's; place() ALSO fires a REAL on-chain tx (private
@@ -21,8 +85,7 @@ function App() {
   const [seal, setSeal] = React.useState(null); // {order}
   const [realTx, setRealTx] = React.useState(null); // {tx, account}
   const committed = React.useRef(false);
-  const traderRef = React.useRef(null);
-  const { createWallet } = useCreateWallet();
+  const wallet = useWallet();
   const { execute } = useTransaction();
 
   const go = (r) => { if (r !== "detail") setMarket(null); setRoute(r); };
@@ -36,8 +99,7 @@ function App() {
     // animation plays regardless; the real hash appears when it lands.
     (async () => {
       try {
-        let acct = traderRef.current;
-        if (!acct) { acct = await createWallet({ storageMode: "private" }); traderRef.current = acct; }
+        const acct = await wallet.connect();
         const masp = order.side === "YES" ? "/packages/place_note.masp" : "/packages/place_no_note.masp";
         const buf = await fetch(masp).then((r) => r.arrayBuffer());
         const ns = NoteScript.fromPackage(Package.deserialize(new Uint8Array(buf)));
@@ -88,7 +150,7 @@ function App() {
     <div style={{ display: "flex", height: "100vh", position: "relative", zIndex: 1 }}>
       <window.Sidebar route={route} go={go} positionsCount={positions.length} />
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-        <window.TopBar left={topLeft} balance={balance} />
+        <window.TopBar left={topLeft} wallet={wallet} />
         <div className="content-scroll" style={{ flex: 1, minHeight: 0 }}>{screen}</div>
       </div>
       {seal ? (
