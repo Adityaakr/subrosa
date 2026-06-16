@@ -181,7 +181,22 @@ recipient via advice inputs) is documented in DECISIONS D-013 as the next refine
 
 Remaining pricing fast-follow: on-chain CPMM/LMSR (odds computed off-chain today).
 
-## Phase 3 — Web client (browser proving + UI)  🟡 built, builds & serves
+## Phase 3 — Web client (browser proving + full product dapp)  ✅ working
+
+Rebuilt as the **full design** (Obscura design kit): a **dark, multi-screen
+product dapp** — Shell + nav (**Markets · Agents · Portfolio**):
+- **Markets** — grid + live on-chain odds (read from the market account).
+- **Market detail** — bet ticket → **Place private position** submits a REAL
+  in-browser tx (private account deployed, clickable tx hash + commitment-only
+  account link). Verified working in-browser (real tx via delegated proving).
+- **Agents** — the confidential-agent section: agent rows (P&L masked ••••, risk
+  cap, **Autonomous / Co-sign** auth, status), guardrail explainer; the
+  `delta-neutral-01` row is the real agent that traded on-chain this build.
+- **Portfolio** — your private book, masked values + "Reveal to me", "Visible
+  on-chain: 0 — commitments only", positions link to their txs.
+Landing page (`web/landing/`) ships separately (light-first marketing site).
+
+(superseded the earlier light single-screen build below)
 
 Scaffolded with `create-miden-app` → **Vite + React 19 + TS** using the official
 web SDK on the **0.14 line** that matches the node: `@miden-sdk/miden-sdk`,
@@ -250,13 +265,19 @@ constructor at runtime; the autonomous path against a funded agent account.
 (`agent.ts` lazy-imports guardian so the autonomous + routing paths run in Node;
 the web SDK WASM is browser-only.)
 
-### Guardian co-sign execution — gated on the user's machine
-`npm run cosign` (`src/cosign-demo.ts`) is written + typechecks against the real
-OZ SDK, but a real on-chain co-sign hash needs **(a)** a running Docker daemon +
-self-hosted Guardian and **(b)** a browser (the `@miden-sdk` WASM is browser-only
-— it does not load in Node). Cannot be produced from this CLI environment;
-runnable by the user (or via a browser co-sign page — see PLAN open items).
-Runbook: `GUARDIAN.md`.
+### Guardian co-sign — RUN against the LIVE Guardian server ✅ (to threshold)
+Self-hosted Guardian stood up via Docker (`OpenZeppelin/guardian`, `docker
+compose up`): HTTP :3000, gRPC :50051, `/pubkey` →
+`0xa072d172…169f`. `npm run cosign` (`src/cosign-demo.ts`) then runs **end-to-end
+in Node** against it (via `file:`-fetch + `fake-indexeddb` polyfills so the
+browser web SDK initializes):
+- connects to the live Guardian, **creates a real 2-of-2 (agent+human) multisig**
+  (e.g. `0xfb7939ed…`), builds a change-threshold proposal, agent signs, human
+  co-signs → **threshold met ✓**.
+- Only the **final proof generation** doesn't complete in Node: the remote prover
+  is gRPC-web (browser fetch semantics) and the local prover needs Web Workers —
+  both browser-only. So the on-chain finalize hash must come from a **browser**
+  run (the dapp Agents screen). Everything up to "ready to submit" is verified here.
 ## Phase 5 — Demo + tutorial  ✅ (Cusp LP layer ☐)
 
 The DevRel artifact — grounded entirely in verified, on-chain evidence:

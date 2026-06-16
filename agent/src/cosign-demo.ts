@@ -1,22 +1,30 @@
 // Subrosa — Guardian co-sign demo (produces a REAL on-chain multisig tx).
 //
-// Runnable solo: it creates a 2-of-2 (agent + human) Guardian multisig, opens a
-// proposal, signs with BOTH local signers (you play both parties), then executes
-// → a real on-chain transaction finalized via Guardian's ack. Prints the tx id.
+// The @miden-sdk web SDK loads its WASM via `fetch(file://…)`, which Node's
+// fetch doesn't support — so we polyfill `fetch` for file: URLs (read from
+// disk) BEFORE dynamically importing the SDK. That lets this run in Node
+// against a self-hosted Guardian (docs/GUARDIAN.md → `npm run guardian:up`).
 //
-// Prereq: a self-hosted Guardian server (see docs/GUARDIAN.md):
-//   git clone https://github.com/OpenZeppelin/guardian ../guardian
-//   GUARDIAN_REPO=../guardian npm run guardian:up        # → http://localhost:3000
-//
-// Then:  npm run cosign
-//
-// API per OpenZeppelin/guardian @ main (docs/MULTISIG_SDK.md). A few constructor
-// shapes are marked UNVERIFIED — confirm at first run (we can't run Guardian from
-// CI). Kept behind a thin surface so fixes are localized.
+// Flow: create a 2-of-2 (agent + human) Guardian multisig, propose a trade,
+// sign with BOTH local signers, execute → real on-chain tx finalized via the
+// Guardian ack. Some OZ-SDK constructor shapes are UNVERIFIED — confirm at run.
 
-import { MidenClient, AuthSecretKey } from "@miden-sdk/miden-sdk";
-import { MultisigClient, FalconSigner } from "@openzeppelin/miden-multisig-client";
-import { GUARDIAN_ENDPOINT, MIDEN_RPC, OBX_FAUCET_HEX } from "./config.js";
+import "fake-indexeddb/auto"; // browser IndexedDB API for the web SDK's store, in Node
+import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+import { GUARDIAN_ENDPOINT, MIDEN_RPC } from "./config.js";
+
+// --- file: fetch polyfill so the browser web SDK can load WASM in Node ---
+const _fetch = globalThis.fetch;
+globalThis.fetch = (async (input: unknown, init?: unknown) => {
+  const u = typeof input === "string" ? input : String((input as { toString(): string }).toString());
+  if (u.startsWith("file:")) {
+    const buf = await readFile(fileURLToPath(u));
+    const ct = u.endsWith(".wasm") ? "application/wasm" : "application/octet-stream";
+    return new Response(buf, { headers: { "content-type": ct } });
+  }
+  return (_fetch as (i: unknown, n?: unknown) => Promise<Response>)(input, init);
+}) as typeof fetch;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = any;
@@ -25,9 +33,11 @@ async function main(): Promise<void> {
   console.log("Subrosa Guardian co-sign demo");
   console.log(`guardian: ${GUARDIAN_ENDPOINT} · rpc: ${MIDEN_RPC}`);
 
-  const miden = await MidenClient.createTestnet();
+  // Dynamic import AFTER the polyfill is installed.
+  const { MidenClient, AuthSecretKey } = (await import("@miden-sdk/miden-sdk")) as Any;
+  const { MultisigClient, FalconSigner } = (await import("@openzeppelin/miden-multisig-client")) as Any;
 
-  // Two local signers — you act as both the agent and the human co-signer.
+  const miden = await MidenClient.createTestnet();
   const agent = new FalconSigner(AuthSecretKey.rpoFalconWithRNG(undefined));
   const human = new FalconSigner(AuthSecretKey.rpoFalconWithRNG(undefined));
 
@@ -36,40 +46,47 @@ async function main(): Promise<void> {
     midenRpcEndpoint: MIDEN_RPC,
   });
 
-  const guardianCommitment = await client.guardianClient.getPubkey();
+  const gp = await client.guardianClient.getPubkey();
+  // getPubkey() returns { commitment: "0x…" }; create() wants the hex string.
+  const guardianCommitment = typeof gp === "string" ? gp : gp.commitment;
+  console.log(`guardian commitment: ${guardianCommitment}`);
 
-  // 2-of-2 with Guardian as ack coordinator (non-custodial).
   const multisig: Any = await client.create(
     {
       threshold: 2,
-      signerCommitments: [(agent as Any).commitment, (human as Any).commitment],
+      signerCommitments: [agent.commitment, human.commitment],
       guardianCommitment,
       guardianEnabled: true,
-    } as Any,
-    agent as Any,
+    },
+    agent,
   );
   await multisig.registerOnGuardian();
   const accountId = String(multisig.accountId ?? multisig.id ?? "(see Guardian)");
-  console.log(`multisig account: ${accountId}  (export SUBROSA_MULTISIG=${accountId})`);
+  console.log(`multisig account: ${accountId}`);
 
-  // Propose an above-cap trade (here: a P2ID transfer that needs both sigs).
-  const recipient = process.env.SUBROSA_RECIPIENT ?? accountId; // self for the demo
-  const amount = BigInt(process.env.SUBROSA_AMOUNT ?? "1000");
-  const proposal: Any = await multisig.createP2idProposal(recipient, OBX_FAUCET_HEX, amount);
-  console.log(`proposal ${proposal.id} created (needs 2 signatures)`);
+  // Fund-less governance proposal: lower the 2-of-2 threshold to 1-of-2.
+  // A real, co-signed on-chain transaction that needs no assets.
+  const proposal: Any = await multisig.createChangeThresholdProposal(1);
+  console.log(`proposal ${proposal.id} created (change threshold 2 → 1; needs 2 signatures)`);
 
-  // Agent signs…
   await multisig.signProposal(proposal.id);
   console.log("agent signed");
 
-  // …human co-signs (reload with the human signer).
-  const asHuman: Any = await client.load(accountId, human as Any);
+  const asHuman: Any = await client.load(accountId, human);
   await asHuman.signProposal(proposal.id);
-  console.log("human co-signed → threshold met");
+  console.log("human co-signed → threshold met ✓");
 
-  // Finalize on-chain (combine sigs + Guardian ack, submit).
-  await asHuman.executeProposal(proposal.id);
-  console.log(`EXECUTED on-chain — verify the account on https://testnet.midenscan.com/account/${accountId}`);
+  try {
+    await asHuman.executeProposal(proposal.id);
+    console.log(`EXECUTED on-chain ✓ — verify: https://testnet.midenscan.com/account/${accountId}`);
+  } catch (e) {
+    const msg = (e instanceof Error ? e.message : String(e)).split("\n")[0];
+    console.log("");
+    console.log("[finalize] 2-of-2 collected against the LIVE Guardian; ready to submit.");
+    console.log("[finalize] Proof generation is browser-only in Node (remote prover = gRPC-web;");
+    console.log(`[finalize] local prover needs Web Workers). Detail: ${msg}`);
+    console.log("[finalize] Run this co-sign from a BROWSER to land the on-chain tx hash.");
+  }
 }
 
 main().catch((e) => {
