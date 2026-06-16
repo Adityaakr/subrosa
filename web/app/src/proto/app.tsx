@@ -434,6 +434,7 @@ function App() {
   const place = (order) => {
     committed.current = false;
     setRealTx(null);
+    const placeId = "p-" + Math.random().toString(36).slice(2, 7); // stable id to patch later
     // Positions are placed from the built-in PRIVATE account (the chain sees
     // only a commitment). If "Protect with Guardian" is on, a real 2-of-N
     // Guardian co-sign must complete first — then the staked bet is sealed.
@@ -451,7 +452,7 @@ function App() {
           return;
         }
       }
-      setSeal({ order });
+      setSeal({ order: { ...order, placeId } });
       try {
         const acct = await builtin.connect();
         const signerRef = acct.id();
@@ -481,6 +482,11 @@ function App() {
         const req = new TransactionRequestBuilder().withOwnOutputNotes(new NoteArray([note])).build();
         const res = await execute({ accountId: signerRef, request: req });
         setRealTx({ tx: res.transactionId, account: signerRef.toString(), marketHex, noteId, coSignMultisig });
+        // If finalize() already created the position (user clicked View before
+        // the tx landed), patch it with the real tx + commitment.
+        setPositions((ps) => ps.map((p) => (p.id === placeId
+          ? { ...p, tx: res.transactionId, noteId, account: signerRef.toString(), marketAccount: marketHex, coSignMultisig, commitment: shortHex(noteId || res.transactionId) }
+          : p)));
         setTimeout(() => { try { builtin.refetch?.(); } catch (e) {} }, 2500); // reflect the lower balance
         window.txToast?.({
           kind: coSignMultisig ? "cosign" : "tx",
@@ -501,13 +507,14 @@ function App() {
       committed.current = true;
       const o = seal.order;
       const pos = {
-        id: "p-" + Math.random().toString(36).slice(2, 7),
+        id: o.placeId || ("p-" + Math.random().toString(36).slice(2, 7)),
         marketId: o.market.id, marketAccount: realTx?.marketHex, side: o.side, size: o.amount,
         avg: Math.round(o.price), shares: o.shares, pnl: 0, value: o.amount,
         commitment: realTx?.noteId ? shortHex(realTx.noteId) : (realTx ? shortHex(realTx.tx) : "(submitting…)"),
-        tx: realTx?.tx, noteId: realTx?.noteId, account: realTx?.account, revealed: false,
+        tx: realTx?.tx, noteId: realTx?.noteId, account: realTx?.account, coSignMultisig: realTx?.coSignMultisig, revealed: false,
       };
-      setPositions((ps) => [pos, ...ps]);
+      // de-dupe in case the place() patch already inserted/updated this id
+      setPositions((ps) => ps.some((p) => p.id === pos.id) ? ps.map((p) => p.id === pos.id ? { ...p, ...pos } : p) : [pos, ...ps]);
     }
     setSeal(null);
     if (navigate) go("positions");

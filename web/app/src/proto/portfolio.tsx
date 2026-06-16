@@ -34,11 +34,14 @@ function PositionRow({ pos, last, resolution, onRedeem }) {
           <window.StatusTag kind={revealed ? "public" : "private"} style={{ height: 18 }} />
         </div>
         <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.question}</div>
-        {pos.tx ? (
-          <a className="mono" href={`https://testnet.midenscan.com/tx/${pos.tx}`} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: "var(--accent)", marginTop: 3, textDecoration: "none", display: "block" }}>{pos.commitment} ↗</a>
-        ) : (
-          <div className="mono" style={{ fontSize: 11, color: "var(--faint)", marginTop: 3 }}>{pos.commitment}</div>
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 3, flexWrap: "wrap" }}>
+          <span className="mono" title="Private position commitment (note id) — on-chain, but reveals nothing about side or size" style={{ fontSize: 11, color: "var(--faint)" }}>
+            commit {pos.commitment}
+          </span>
+          {pos.tx ? (
+            <a className="mono" href={`https://testnet.midenscan.com/tx/${pos.tx}`} target="_blank" rel="noreferrer" title="Public transaction that created this position" style={{ fontSize: 11, color: "var(--accent)", textDecoration: "none" }}>tx ↗</a>
+          ) : null}
+        </div>
       </div>
       <span className="tag" style={{ display: "inline-flex", alignItems: "center", gap: 4, height: 22, padding: "0 9px", borderRadius: 999, justifySelf: "start", color: pos.side === "YES" ? "var(--yes)" : "var(--no)", background: pos.side === "YES" ? "var(--yes-dim)" : "var(--no-dim)" }}>{pos.side}</span>
       <span className="mono" style={{ fontSize: 13.5, color: "var(--text)" }}>{window.fmtUsd(pos.size)}</span>
