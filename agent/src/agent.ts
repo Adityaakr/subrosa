@@ -9,7 +9,8 @@
 
 import { readMarket, placeAutonomous } from "./onchain.js";
 import { decide } from "./strategy.js";
-import { AUTONOMOUS_CAP, AGENT_ACCOUNT_HEX, POLL_INTERVAL_MS } from "./config.js";
+import { llmConfigured } from "./llm.js";
+import { AUTONOMOUS_CAP, AGENT_ACCOUNT_HEX, POLL_INTERVAL_MS, OPENROUTER_MODEL } from "./config.js";
 // guardian.ts pulls in the browser web SDK (WASM), which only loads in a
 // browser — so it's imported lazily, only when the above-cap co-sign path runs.
 
@@ -17,7 +18,7 @@ async function tick(): Promise<void> {
   const odds = await readMarket();
   console.log(`[odds] yes=${odds.yes} no=${odds.no} resolution=${odds.resolution}`);
 
-  const d = decide(odds);
+  const d = await decide(odds);
   if (!d) {
     console.log("[decide] no edge — holding");
     return;
@@ -57,7 +58,8 @@ async function tick(): Promise<void> {
 async function main(): Promise<void> {
   const once = process.argv.includes("--once");
   console.log(
-    `Subrosa agent · cap ${AUTONOMOUS_CAP} OBX · ${once ? "single tick" : `polling every ${POLL_INTERVAL_MS}ms`}`,
+    `Subrosa agent · brain ${llmConfigured() ? `OpenRouter (${OPENROUTER_MODEL})` : "heuristic"} · ` +
+      `cap ${AUTONOMOUS_CAP} OBX · ${once ? "single tick" : `polling every ${POLL_INTERVAL_MS}ms`}`,
   );
   if (once) {
     await tick();

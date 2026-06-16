@@ -1,12 +1,26 @@
 import type { MarketOdds } from "./onchain.js";
+import { llmConfigured, llmDecide } from "./llm.js";
 
 export type Decision = { side: "yes" | "no"; size: bigint; reason: string } | null;
 
-// Trivial value strategy (the "brain" is off-chain and private). Implied
-// P(YES) = no/(yes+no) per the CPMM convention. If a side looks underpriced
-// vs a fair 50/50 prior, take it; size scales with conviction. Real strategies
-// (Polybaskets logic) plug in here without changing the guardrail wiring.
-export function decide(odds: MarketOdds): Decision {
+// The agent's decision: when OpenRouter is configured, an LLM reasons over the
+// live odds (private, off-chain brain); otherwise the heuristic below. The LLM
+// path falls back to the heuristic on any error so the loop never stalls.
+export async function decide(odds: MarketOdds): Promise<Decision> {
+  if (llmConfigured()) {
+    try {
+      return await llmDecide(odds);
+    } catch (e) {
+      console.warn("[strategy] LLM failed, using heuristic:", e instanceof Error ? e.message : e);
+    }
+  }
+  return heuristicDecide(odds);
+}
+
+// Trivial value heuristic. Implied P(YES) = no/(yes+no) per the CPMM convention.
+// If a side looks underpriced vs a fair 50/50 prior, take it; size scales with
+// conviction.
+export function heuristicDecide(odds: MarketOdds): Decision {
   if (odds.resolution !== 0n) return null; // resolved → no trading
   const total = odds.yes + odds.no;
   if (total === 0n) return null;

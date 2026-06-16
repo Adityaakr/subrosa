@@ -6,6 +6,15 @@
 //   - AGENT_ACCOUNT  : 1-of-1 private account → autonomous trades up to CAP.
 //   - MULTISIG_ACCOUNT: 2-of-N (agent + human) Guardian multisig → above CAP,
 //     the agent proposes and a human co-signs via Guardian before it executes.
+import "dotenv/config"; // load agent/.env (OPENROUTER_API_KEY, DATABASE_URL, …)
+
+// OpenRouter — the agent's private "brain". When set, trade decisions come from
+// an LLM reasoning over the live public odds; otherwise a heuristic fallback.
+export const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY ?? "";
+export const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL ?? "openai/gpt-4o-mini";
+// Human-readable question for the market the agent trades (context for the LLM).
+export const MARKET_QUESTION =
+  process.env.SUBROSA_MARKET_QUESTION ?? "Will Miden mainnet launch before Aug 1, 2026?";
 
 export const MARKET_ID_HEX =
   process.env.SUBROSA_MARKET ?? "0x5ff0303f0b795d1039ca5b51d8480b";
