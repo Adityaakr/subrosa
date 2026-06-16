@@ -9,8 +9,9 @@
 
 import { readMarket, placeAutonomous } from "./onchain.js";
 import { decide } from "./strategy.js";
-import { proposeAndCoSign } from "./guardian.js";
 import { AUTONOMOUS_CAP, AGENT_ACCOUNT_HEX, POLL_INTERVAL_MS } from "./config.js";
+// guardian.ts pulls in the browser web SDK (WASM), which only loads in a
+// browser — so it's imported lazily, only when the above-cap co-sign path runs.
 
 async function tick(): Promise<void> {
   const odds = await readMarket();
@@ -29,6 +30,7 @@ async function tick(): Promise<void> {
     console.log(`[auto]   submitted ${tx}`);
   } else {
     console.log(`[cosign] ${d.size} > cap ${AUTONOMOUS_CAP} → human co-sign via Guardian`);
+    const { proposeAndCoSign } = await import("./guardian.js");
     const r = await proposeAndCoSign({
       multisigAccountId: process.env.SUBROSA_MULTISIG ?? "",
       recipientHex: AGENT_ACCOUNT_HEX,
