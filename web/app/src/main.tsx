@@ -14,13 +14,9 @@ import "./proto/seal.tsx";
 import "./proto/portfolio.tsx";
 import App from "./proto/app.tsx";
 
-// In dev, route RPC + delegated proving + note transport through the Vite
-// same-origin proxy (see vite.config.ts) to dodge the cross-origin COEP/CORS
-// wall. In a real deploy, set these to your own reverse-proxied paths.
-const ORIGIN = typeof window !== "undefined" ? window.location.origin : "";
-const midenConfig = import.meta.env.DEV
-  ? { rpcUrl: ORIGIN, prover: ORIGIN, noteTransportUrl: ORIGIN }
-  : { rpcUrl: MIDEN_RPC_URL, prover: MIDEN_PROVER };
+// Connect straight to testnet. The COEP `credentialless` header (vite.config)
+// lets the browser load these CORS-enabled cross-origin endpoints directly.
+const midenConfig = { rpcUrl: MIDEN_RPC_URL, prover: MIDEN_PROVER };
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

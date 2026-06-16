@@ -3,22 +3,21 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { midenVitePlugin } from "@miden-sdk/vite-plugin";
 
+// Cross-origin isolation for the WASM client's worker threads. We set the
+// headers ourselves (the Miden plugin hardcodes require-corp) using
+// `credentialless` instead: it still isolates (SharedArrayBuffer works) but
+// lets the browser load the CORS-enabled testnet RPC/prover responses without
+// requiring a Cross-Origin-Resource-Policy header on them — which the testnet
+// endpoints don't send. So the client connects DIRECTLY to testnet, no proxy.
+const coiHeaders = {
+  "Cross-Origin-Opener-Policy": "same-origin",
+  "Cross-Origin-Embedder-Policy": "credentialless",
+};
+
 export default defineConfig({
-  plugins: [react(), midenVitePlugin({ crossOriginIsolation: true })],
-  // The Miden web client (WASM worker) talks gRPC-web to the testnet RPC +
-  // delegated prover. Hitting them cross-origin fails under our COEP
-  // (require-corp) headers AND the endpoints send no CORS headers. The Rust
-  // client also rejects any node URL that carries a path. So we point it at the
-  // app's OWN bare origin and route by gRPC service-path prefix to each upstream
-  // — same-origin to the browser, no CORS, valid node URL.
-  // (A production deploy needs the equivalent reverse-proxy in front of it.)
-  server: {
-    proxy: {
-      "/rpc.Api": { target: "https://rpc.testnet.miden.io", changeOrigin: true, secure: true, ws: false },
-      "/remote_prover.Api": { target: "https://tx-prover.testnet.miden.io", changeOrigin: true, secure: true, ws: false },
-      "/miden_note_transport.MidenNoteTransport": { target: "https://transport.miden.io", changeOrigin: true, secure: true, ws: false },
-    },
-  },
+  plugins: [react(), midenVitePlugin({ crossOriginIsolation: false })],
+  server: { headers: coiHeaders },
+  preview: { headers: coiHeaders },
   resolve: {
     dedupe: ["react", "react-dom", "react/jsx-runtime"],
     alias: {
