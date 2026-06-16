@@ -45,7 +45,11 @@ function MarketTile({ m, onOpen }) {
       style={{ background: "var(--surface)", border: `1px solid ${h ? "var(--hair-2)" : "var(--hair)"}`, borderRadius: "var(--r)", padding: 18, cursor: "pointer", transition: "all 180ms cubic-bezier(0.22,1,0.36,1)", transform: h ? "translateY(-3px)" : "none", boxShadow: h ? "0 16px 36px rgba(12,12,14,0.10), 0 0 0 1px rgba(255,85,0,0.10)" : "0 1px 2px rgba(12,12,14,0.05)", display: "flex", flexDirection: "column", gap: 14, minHeight: 196 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <window.Cat name={m.category} />
-        {m._live ? <LiveBadge /> : (
+        {m._resolution ? (
+          <span className="mono" title="Resolved on-chain" style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 9.5, letterSpacing: "0.1em", textTransform: "uppercase", color: m._resolution === 1 ? "var(--yes)" : "var(--no)", background: m._resolution === 1 ? "var(--yes-dim)" : "var(--no-dim)", padding: "2px 7px", borderRadius: 999 }}>
+            ✓ {m._resolution === 1 ? "YES" : "NO"} won
+          </span>
+        ) : m._live ? <LiveBadge /> : (
           <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5 }} className="mono">
             <window.Icon name={up ? "trending-up" : "trending-down"} size={13} color={up ? "var(--yes)" : "var(--no)"} />
             <span style={{ color: up ? "var(--yes)" : "var(--no)" }}>{up ? "+" : ""}{m.change}%</span>
@@ -196,6 +200,34 @@ function ActivityFeed() {
   );
 }
 
+const RES_LABEL = { 1: "YES", 2: "NO" };
+
+/* Resolved market: betting closed; winners redeem from the Positions screen. */
+function ResolvedPanel({ m, resolution }) {
+  const won = RES_LABEL[resolution];
+  const c = resolution === 1 ? "var(--yes)" : "var(--no)";
+  const bg = resolution === 1 ? "var(--yes-dim)" : "var(--no-dim)";
+  return (
+    <div style={{ position: "sticky", top: 0, background: "var(--glass)", backdropFilter: "blur(14px)", border: "1px solid var(--hair-2)", borderRadius: "var(--r)", padding: 20, boxShadow: "0 20px 50px rgba(12,12,14,0.12)" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+        <span style={{ fontFamily: "var(--disp)", fontWeight: 700, fontSize: 16, color: "var(--text)" }}>Market resolved</span>
+        <span className="tag" style={{ color: c, background: bg, padding: "3px 9px", borderRadius: 999 }}>{won} WON</span>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 16px", borderRadius: "var(--r-md)", background: bg, border: `1px solid ${c}33` }}>
+        <window.Icon name="shield-check" size={20} color={c} />
+        <div>
+          <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text)" }}>Outcome: {won}</div>
+          <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>Recorded on-chain by the resolver. Betting is closed.</div>
+        </div>
+      </div>
+      <p style={{ display: "flex", alignItems: "center", gap: 7, margin: "16px 0 0", fontSize: 12.5, color: "var(--muted)", lineHeight: 1.5 }}>
+        <window.Icon name="wallet" size={14} color="var(--accent)" />
+        Hold a winning <b style={{ color: "var(--text)" }}>{won}</b> position? Redeem it from your <b style={{ color: "var(--text)" }}>Positions</b> — only the winning side can redeem (the chain enforces it).
+      </p>
+    </div>
+  );
+}
+
 /* ---------- bet panel ---------- */
 function BetPanel({ m, balance, onPlace }) {
   const [side, setSide] = uS("YES");
@@ -208,6 +240,8 @@ function BetPanel({ m, balance, onPlace }) {
   const liq = parseAbb(m.liquidity);
   const impact = Math.min(9, (amt / liq) * 100 * 0.7);
   const max = Math.min(2000, balance);
+
+  if (m._resolution) return <ResolvedPanel m={m} resolution={m._resolution} />;
 
   return (
     <div style={{ position: "sticky", top: 0, background: "var(--glass)", backdropFilter: "blur(14px)", border: "1px solid var(--hair-2)", borderRadius: "var(--r)", padding: 20, boxShadow: "0 20px 50px rgba(12,12,14,0.12)" }}>
