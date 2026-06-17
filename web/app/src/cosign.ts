@@ -37,5 +37,10 @@ export async function guardianCoSign(onStep) {
 
   step("Executing co-sign on-chain…");
   await asHuman.executeProposal(proposal.id);
+  // Release the co-sign client so it doesn't contend with the app's main client
+  // on the shared WASM instance, then let things settle before the place tx.
+  try { (miden as any).free?.(); } catch (e) {}
+  try { (miden as any)[Symbol.dispose]?.(); } catch (e) {}
+  await new Promise((r) => setTimeout(r, 1500));
   return { multisig: accountId };
 }

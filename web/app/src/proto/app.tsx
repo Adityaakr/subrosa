@@ -465,22 +465,34 @@ function App() {
         const buf = await fetch(masp).then((r) => r.arrayBuffer());
         const ns = NoteScript.fromPackage(Package.deserialize(new Uint8Array(buf)));
         const mid = AccountId.fromHex(marketHex);
-        const rec = new NoteRecipient(randomWord(), ns, new NoteStorage(new FeltArray()));
-        const meta = new NoteMetadata(senderId, NoteType.Private, NoteTag.withAccountTarget(mid));
-        // STAKE the bet in OBX: the private note carries `amount` of the wallet's
-        // OBX, so placing actually debits your balance (a real collateralised
-        // position, not a zero-asset commitment).
         const faucetHex = (() => { try { return localStorage.getItem(FAUCET_LS); } catch (e) { return null; } })();
-        let assets;
-        try {
-          assets = (faucetHex && order.amount > 0)
-            ? new NoteAssets([new FungibleAsset(toAccountId(faucetHex), parseAssetAmount(String(order.amount), FUND_DECIMALS))])
-            : new NoteAssets();
-        } catch (e) { assets = new NoteAssets(); }
-        const note = new Note(assets, meta, rec);
-        const noteId = (() => { try { return note.id().toString(); } catch (e) { return null; } })();
-        const req = new TransactionRequestBuilder().withOwnOutputNotes(new NoteArray([note])).build();
-        const res = await execute({ accountId: signerRef, request: req });
+
+        // STAKE the bet in OBX (the private note carries `amount` of your OBX, so
+        // placing debits your balance). Build + submit with a retry — a protected
+        // bet's co-sign uses a second client, and a transient WASM/RPC hiccup can
+        // fail the first submit; rebuild the note fresh each attempt.
+        let res, noteId;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          try {
+            let assets;
+            try {
+              assets = (faucetHex && order.amount > 0)
+                ? new NoteAssets([new FungibleAsset(toAccountId(faucetHex), parseAssetAmount(String(order.amount), FUND_DECIMALS))])
+                : new NoteAssets();
+            } catch (e) { assets = new NoteAssets(); }
+            const rec = new NoteRecipient(randomWord(), ns, new NoteStorage(new FeltArray()));
+            const meta = new NoteMetadata(senderId, NoteType.Private, NoteTag.withAccountTarget(mid));
+            const note = new Note(assets, meta, rec);
+            noteId = (() => { try { return note.id().toString(); } catch (e) { return null; } })();
+            const req = new TransactionRequestBuilder().withOwnOutputNotes(new NoteArray([note])).build();
+            res = await execute({ accountId: signerRef, request: req });
+            break;
+          } catch (e) {
+            console.warn(`[place] attempt ${attempt}/3 failed:`, e?.message || e);
+            if (attempt === 3) throw e;
+            await new Promise((r) => setTimeout(r, 2000 * attempt));
+          }
+        }
         setRealTx({ tx: res.transactionId, account: signerRef.toString(), marketHex, noteId, coSignMultisig });
         // If finalize() already created the position (user clicked View before
         // the tx landed), patch it with the real tx + commitment.

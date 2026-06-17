@@ -29,6 +29,30 @@ function Scramble({ target, active, dur = 900 }) {
 // Shows the value → redaction wipe (sealing, dramatizing "hidden from chain") →
 // reveals the value again once `revealed` (done): it's YOUR data, only the chain
 // never sees it.
+// One clear hash row: public hashes link to the explorer (accent pill + ↗),
+// the private commitment is shown as text (a private note isn't browsable).
+function HashRow({ label, value, href, priv, pub, hint, pending }) {
+  const short = value ? (String(value).length > 18 ? `${String(value).slice(0, 10)}…${String(value).slice(-6)}` : String(value)) : null;
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+      <span className="tag" style={{ color: "var(--faint)", whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 5 }}>
+        <window.Icon name={priv ? "eye-off" : "shield-check"} size={11} color="var(--faint)" /> {label}
+      </span>
+      {short ? (
+        href ? (
+          <a href={href} target="_blank" rel="noreferrer" className="mono" style={{ fontSize: 12, color: "var(--accent)", fontWeight: 500, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4, background: "var(--accent-dim)", border: "1px solid rgba(255,85,0,0.22)", borderRadius: 999, padding: "3px 9px" }}>
+            {short} <window.Icon name="chevron-right" size={11} color="var(--accent)" /> explorer
+          </a>
+        ) : (
+          <span className="mono" title={hint} style={{ fontSize: 12, color: "var(--text)", fontWeight: 500, background: "var(--surface-2)", borderRadius: 999, padding: "3px 9px" }}>{short}</span>
+        )
+      ) : (
+        <span className="mono" style={{ fontSize: 12, color: "var(--accent)" }}>{pending || "…"}</span>
+      )}
+    </div>
+  );
+}
+
 function RedactField({ label, value, sealing, revealed }) {
   const hidden = sealing && !revealed;
   return (
@@ -115,25 +139,12 @@ function PrivacySeal({ order, publicYes, realTx, onView, onClose }) {
             <RedactField label="SIZE" value={`${order.amount} OBX`} sealing={sealing} revealed={phase === "done"} />
             <RedactField label="SHARES" value={order.shares.toFixed(1)} sealing={sealing} revealed={phase === "done"} />
           </div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 14, borderTop: "1px solid var(--hair)", gap: 10 }}>
-            <span className="tag" style={{ color: "var(--faint)", whiteSpace: "nowrap" }}>POSITION COMMITMENT</span>
-            {realTx && realTx.noteId ? (
-              <span className="mono" title="The on-chain commitment of your private position — reveals nothing about side or size" style={{ fontSize: 12.5, color: "var(--text)", fontWeight: 500, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
-                {realTx.noteId.slice(0, 10)}…{realTx.noteId.slice(-6)}
-              </span>
-            ) : (
-              <span className="mono" style={{ fontSize: 12.5, color: sealing ? "var(--accent)" : "var(--faint)" }}>sealing…</span>
-            )}
-          </div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 12, gap: 10 }}>
-            <span className="tag" style={{ color: "var(--faint)", whiteSpace: "nowrap" }}>ON-CHAIN TX · PUBLIC</span>
-            {realTx ? (
-              <a href={`https://testnet.midenscan.com/tx/${realTx.tx}`} target="_blank" rel="noreferrer" className="mono" style={{ fontSize: 12.5, color: "var(--accent)", fontWeight: 500, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 5, minWidth: 0 }}>
-                {realTx.tx.slice(0, 10)}…{realTx.tx.slice(-6)} <window.Icon name="chevron-right" size={12} color="var(--accent)" />
-              </a>
-            ) : (
-              <span className="mono" style={{ fontSize: 12.5, color: sealing ? "var(--accent)" : "var(--faint)" }}>writing on-chain…</span>
-            )}
+          <div style={{ borderTop: "1px solid var(--hair)", paddingTop: 12, display: "flex", flexDirection: "column", gap: 9 }}>
+            <HashRow label="Position commitment" priv hint="The on-chain commitment of your private position — reveals nothing about side or size" value={realTx && realTx.noteId} pending={sealing ? "sealing…" : "—"} />
+            <HashRow label="Transaction" pub value={realTx && realTx.tx} href={realTx && `https://testnet.midenscan.com/tx/${realTx.tx}`} pending={sealing ? "writing on-chain…" : "—"} />
+            {realTx && realTx.coSignMultisig ? (
+              <HashRow label="Guardian co-sign · 2-of-N" pub value={realTx.coSignMultisig} href={`https://testnet.midenscan.com/account/${realTx.coSignMultisig}`} />
+            ) : null}
           </div>
         </div>
 
