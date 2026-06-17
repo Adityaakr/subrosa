@@ -371,10 +371,11 @@ function Row({ k, v, vc, big }) {
 }
 
 /* ---------- market detail ---------- */
-function MarketDetail({ m: m0, go, onPlace, balance, liveMarkets }) {
+function MarketDetail({ m: m0, go, onPlace, balance, liveMarkets, addresses }) {
   const m = withLive(m0, liveMarkets);
   const isLive = !!m._live;
   const ls = liveMarkets ? liveMarkets[m0.id] : null; // raw on-chain reserves
+  const marketHex = addresses ? addresses[m0.id] : null; // on-chain account id
   const resLabel = m._resolution === 1 ? "YES won" : m._resolution === 2 ? "NO won" : "Unresolved";
   const trades = useReserveTrades(ls);
   const [live, flash] = window.useLiveOdds(m.yes);
@@ -428,6 +429,18 @@ function MarketDetail({ m: m0, go, onPlace, balance, liveMarkets }) {
                   <span>YES reserve <b style={{ color: "var(--text)" }}>{ls.yes.toLocaleString()}</b></span>
                   <span>NO reserve <b style={{ color: "var(--text)" }}>{ls.no.toLocaleString()}</b></span>
                   <span>OBX</span>
+                </div>
+              ) : null}
+              {/* verifiable on-chain market account — anyone can open it on the explorer */}
+              {isLive && marketHex ? (
+                <div style={{ marginTop: 13, paddingTop: 13, borderTop: "1px solid var(--hair)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, minWidth: 0 }}>
+                  <span className="tag" style={{ color: "var(--faint)", display: "inline-flex", alignItems: "center", gap: 5, whiteSpace: "nowrap" }}>
+                    <window.Icon name="shield-check" size={12} color="var(--faint)" /> MARKET ACCOUNT
+                  </span>
+                  <a href={`https://testnet.midenscan.com/account/${marketHex}`} target="_blank" rel="noreferrer" className="mono" title={marketHex}
+                    style={{ fontSize: 12, color: "var(--accent)", fontWeight: 500, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4, background: "var(--accent-dim)", border: "1px solid rgba(255,85,0,0.22)", borderRadius: 999, padding: "3px 9px", whiteSpace: "nowrap", flexShrink: 0, maxWidth: "100%" }}>
+                    {`${marketHex.slice(0, 10)}…${marketHex.slice(-6)}`} <window.Icon name="chevron-right" size={11} color="var(--accent)" /> verify on-chain
+                  </a>
                 </div>
               ) : null}
             </div>

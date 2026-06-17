@@ -643,7 +643,7 @@ function App() {
   };
 
   let screen;
-  if (route === "detail" && market) screen = <window.MarketDetail m={market} go={go} onPlace={place} balance={liveBalance} liveMarkets={live} />;
+  if (route === "detail" && market) screen = <window.MarketDetail m={market} go={go} onPlace={place} balance={liveBalance} liveMarkets={live} addresses={LIVE_MARKETS} />;
   else if (route === "positions") screen = <window.PositionsScreen positions={positions} balance={liveBalance} go={go} live={live} onRedeem={redeem} />;
   else if (route === "agents") screen = <window.AgentsScreen agents={agents} onPropose={proposeAboveCap} />;
   else if (route === "approvals") screen = <window.ApprovalsScreen approvals={approvals} onCoSign={coSignApproval} onDecline={declineApproval} go={go} />;
