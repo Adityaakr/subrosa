@@ -18,11 +18,7 @@ const coiHeaders = {
 // to the self-hosted Guardian's plain HTTP REST (:3000). In prod (Railway) the
 // Guardian runs as a separate service — point GUARDIAN_URL at its internal URL
 // (e.g. http://guardian.railway.internal:3000). Falls back to localhost in dev.
-// Accept a full URL or a bare host. Railway variables are often pasted without a
-// scheme (e.g. "guardian-xyz.up.railway.app"); a scheme-less proxy target crashes
-// the proxy, so default a missing scheme to https.
-const rawGuardian = process.env.GUARDIAN_URL || "http://localhost:3000";
-const guardianTarget = /^https?:\/\//.test(rawGuardian) ? rawGuardian : `https://${rawGuardian}`;
+const guardianTarget = process.env.GUARDIAN_URL || "http://localhost:3000";
 const guardianProxy = {
   "/guardian": { target: guardianTarget, changeOrigin: true, ws: false, rewrite: (p: string) => p.replace(/^\/guardian/, "") },
 };
