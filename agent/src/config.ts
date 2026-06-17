@@ -44,5 +44,30 @@ export const SLOT_YES = "miden_market::market::yes_reserve";
 export const SLOT_NO = "miden_market::market::no_reserve";
 export const SLOT_RES = "miden_market::market::resolution";
 
-// Loop cadence (ms).
-export const POLL_INTERVAL_MS = Number(process.env.SUBROSA_POLL_MS ?? "15000");
+// Loop cadence (ms). Proving + submitting a place tx takes ~1–2 min and ticks
+// never overlap (the next is scheduled only after the current finishes), so the
+// floor is 60s to avoid hammering the RPC/CLI; default is a calm 5 min.
+export const POLL_INTERVAL_MS = Math.max(
+  60_000,
+  Number(process.env.SUBROSA_POLL_MS ?? "300000"),
+);
+
+// ── Autonomous-loop safety rails ──────────────────────────────────────────
+// A hands-off agent on testnet needs hard stops so it can't run away.
+// Master switch: SUBROSA_AGENT_ENABLED=0 starts the agent in read-only mode
+// (reads odds + decides, never places). Defaults on.
+export const AGENT_ENABLED = (process.env.SUBROSA_AGENT_ENABLED ?? "1") !== "0";
+// Decide + log but never submit a real tx (safe to run anywhere).
+export const DRY_RUN = (process.env.SUBROSA_DRY_RUN ?? "0") === "1";
+// Session budget: stop after this many placed trades, or once cumulative staked
+// OBX would exceed the budget. Both are terminal — the loop ends cleanly.
+export const MAX_TRADES = Number(process.env.SUBROSA_MAX_TRADES ?? "20");
+export const BUDGET_OBX = BigInt(process.env.SUBROSA_BUDGET_OBX ?? "5000");
+// On repeated errors, back off exponentially up to this ceiling (ms).
+export const ERROR_BACKOFF_MS = Number(process.env.SUBROSA_BACKOFF_MS ?? "300000");
+// Runtime kill switch: if this file exists, the loop halts before its next tick.
+// (touch agent/.agent-stop to stop a running agent; rm it to allow restart.)
+export const STOP_FILE = ".agent-stop";
+// Fixed on-chain stake per side baked into the compiled place_*.masp (v1).
+// Used for budget accounting; the LLM's size drives cap routing (intent).
+export const STAKE_OBX = { yes: 250n, no: 100n } as const;

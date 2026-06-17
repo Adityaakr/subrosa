@@ -29,7 +29,15 @@ function wordToBigInt(hex: string): bigint {
 
 export async function readMarket(): Promise<MarketOdds> {
   await run(MIDEN_CLI, ["sync"], { cwd: ROOT }).catch(() => {});
-  const { stdout } = await run(MIDEN_CLI, ["account", "-s", MARKET_ID_HEX], { cwd: ROOT });
+  let stdout = "";
+  try {
+    ({ stdout } = await run(MIDEN_CLI, ["account", "-s", MARKET_ID_HEX], { cwd: ROOT }));
+  } catch (e) {
+    // CLI missing / market not imported / RPC blip: hold this tick rather than
+    // throw. Zero reserves → decide() returns null → the loop just waits.
+    console.warn("[onchain] could not read market (holding):", e instanceof Error ? e.message.split("\n")[0] : e);
+    return { yes: 0n, no: 0n, resolution: 0n };
+  }
   const slot = (name: string): bigint => {
     const m = stdout.match(new RegExp(name.replace(/[:]/g, ":") + "[\\s\\S]*?(0x[0-9a-f]{64})"));
     return m ? wordToBigInt(m[1]) : 0n;

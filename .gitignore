@@ -23,3 +23,7 @@ dist/
 
 # local tooling
 .claude/
+
+# autonomous agent runtime files
+agent/.agent-status.json
+agent/.agent-stop
