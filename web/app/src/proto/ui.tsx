@@ -141,11 +141,12 @@ function NavBtn({ it, on, onClick }) {
   );
 }
 
-function Sidebar({ route, go, positionsCount }) {
+function Sidebar({ route, go, positionsCount, approvalsCount }) {
   const items = [
     { k: "markets", label: "Markets", icon: "layers" },
     { k: "positions", label: "Positions", icon: "wallet", badge: positionsCount },
     { k: "agents", label: "Agents", icon: "bot" },
+    { k: "approvals", label: "Approvals", icon: "shield-check", badge: approvalsCount },
   ];
   const active = (k) => route === k || (k === "markets" && route === "detail");
   return (

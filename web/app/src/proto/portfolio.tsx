@@ -118,9 +118,10 @@ function PositionsScreen({ positions, balance, go, live, onRedeem }) {
 }
 
 /* ---------- Agents ---------- */
-function AgentCard({ a }) {
+function AgentCard({ a, onPropose }) {
   const active = a.status === "active";
   const pct = Math.round((a.deployed / a.cap) * 100);
+  const atCap = a.deployed >= a.cap;
   return (
     <div style={{ background: "var(--surface)", border: "1px solid var(--hair)", borderRadius: "var(--r)", padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
@@ -162,6 +163,15 @@ function AgentCard({ a }) {
         </div>
       </div>
 
+      {/* programmable auth in action: a trade beyond the cap needs a human co-sign */}
+      {a.cosign && onPropose ? (
+        <button onClick={() => onPropose(a)} title="The agent wants to deploy beyond its cap — raise a 2-of-N Guardian co-sign request for you to approve"
+          style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", padding: "10px 12px", borderRadius: "var(--r-md)", cursor: "pointer", border: "1px solid rgba(255,85,0,0.3)", background: "var(--accent-dim)", color: "var(--accent)", fontSize: 12.5, fontWeight: 600, transition: "all 140ms ease" }}>
+          <window.Icon name="key-round" size={13} color="var(--accent)" />
+          {atCap ? "At cap — request above-cap trade" : "Request above-cap trade"}
+        </button>
+      ) : null}
+
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 14, borderTop: "1px solid var(--hair)" }}>
         <span style={{ fontSize: 12.5, color: "var(--faint)" }}><b style={{ color: "var(--text)" }} className="mono">{a.markets}</b> markets · {a.since}</span>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
@@ -174,8 +184,8 @@ function AgentCard({ a }) {
   );
 }
 
-function AgentsScreen() {
-  const A = window.OBS.agents;
+function AgentsScreen({ agents, onPropose } = {}) {
+  const A = agents || window.OBS.agents;
   const activeN = A.filter((a) => a.status === "active").length;
   const cap = A.reduce((s, a) => s + a.cap, 0);
   const dep = A.reduce((s, a) => s + a.deployed, 0);
@@ -199,11 +209,103 @@ function AgentsScreen() {
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-          {A.map((a) => <AgentCard key={a.id} a={a} />)}
+          {A.map((a) => <AgentCard key={a.id} a={a} onPropose={onPropose} />)}
         </div>
       </div>
     </div>
   );
 }
 
-Object.assign(window, { PositionsScreen, AgentsScreen });
+/* ---------- Guardian approvals ---------- */
+function ApprovalRow({ ap, onCoSign, onDecline }) {
+  const signing = ap.status === "signing";
+  const approved = ap.status === "approved";
+  const declined = ap.status === "declined";
+  const over = Math.round(((ap.requested - ap.cap) / ap.cap) * 100);
+  const statusChip = approved
+    ? <window.Chip color="var(--yes)" border="1px solid var(--yes)"><window.Icon name="shield-check" size={11} color="var(--yes)" />GUARDIAN VERIFIED · 2-of-N</window.Chip>
+    : declined
+    ? <window.Chip color="var(--faint)" border="1px solid var(--hair-2)"><window.Icon name="x" size={11} color="var(--faint)" />DECLINED</window.Chip>
+    : signing
+    ? <window.Chip color="var(--accent)" border="1px solid rgba(255,85,0,0.3)"><span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--accent)", animation: "blink 1.2s infinite" }} />CO-SIGNING…</window.Chip>
+    : <window.Chip color="var(--accent)" border="1px solid rgba(255,85,0,0.3)"><window.Icon name="key-round" size={11} color="var(--accent)" />AWAITING YOUR CO-SIGN</window.Chip>;
+  return (
+    <div style={{ background: "var(--surface)", border: `1px solid ${approved ? "var(--yes)" : declined ? "var(--hair)" : "rgba(255,85,0,0.3)"}`, borderRadius: "var(--r)", padding: 18, display: "flex", flexDirection: "column", gap: 14, opacity: declined ? 0.62 : 1 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+        <div style={{ display: "flex", gap: 12, minWidth: 0 }}>
+          <div style={{ width: 38, height: 38, borderRadius: "var(--r-md)", background: "rgba(163,0,214,0.12)", border: "1px solid rgba(163,0,214,0.3)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
+            <window.Icon name="bot" size={18} color="var(--agent)" />
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <div className="mono" style={{ fontSize: 14, color: "var(--text)", fontWeight: 500 }}>{ap.agentName}</div>
+            <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 3 }}>wants to deploy <b className="mono" style={{ color: "var(--accent)" }}>{window.fmtUsd(ap.requested)}</b> on <span style={{ color: "var(--text)" }}>{ap.marketName}</span></div>
+          </div>
+        </div>
+        {statusChip}
+      </div>
+
+      <div style={{ display: "flex", gap: 10, padding: "10px 12px", borderRadius: "var(--r-md)", background: "var(--bg)", border: "1px solid var(--hair)", fontSize: 12.5, color: "var(--muted)" }}>
+        <window.Icon name="alert-triangle" size={14} color="var(--accent)" />
+        <span>Exceeds its programmable-auth cap of <b className="mono" style={{ color: "var(--text)" }}>{window.fmtUsd(ap.cap)}</b> by <b style={{ color: "var(--accent)" }}>{over}%</b> — a human co-sign is required before this capital is authorized.</span>
+      </div>
+
+      {signing && ap.step ? (
+        <div className="mono" style={{ fontSize: 12, color: "var(--accent)", display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--accent)", animation: "blink 1.2s infinite" }} />{ap.step}
+        </div>
+      ) : null}
+
+      {approved && ap.multisig ? (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 13, borderTop: "1px solid var(--hair)" }}>
+          <span className="tag" style={{ color: "var(--faint)" }}>MULTISIG ACCOUNT</span>
+          <a href={`https://testnet.midenscan.com/account/${ap.multisig}`} target="_blank" rel="noreferrer" className="mono" style={{ fontSize: 12, color: "var(--accent)", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4, background: "var(--accent-dim)", border: "1px solid rgba(255,85,0,0.22)", borderRadius: 999, padding: "3px 9px" }}>
+            {String(ap.multisig).length > 14 ? `${String(ap.multisig).slice(0, 8)}…${String(ap.multisig).slice(-4)}` : ap.multisig} <window.Icon name="chevron-right" size={11} color="var(--accent)" /> explorer
+          </a>
+        </div>
+      ) : ap.status === "pending" ? (
+        <div style={{ display: "flex", gap: 10, paddingTop: 4 }}>
+          <window.Btn variant="primary" full icon="key-round" onClick={() => onCoSign(ap)}>Co-sign (2-of-N)</window.Btn>
+          <window.Btn variant="ghost" icon="x" onClick={() => onDecline(ap.id)}>Decline</window.Btn>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ApprovalsScreen({ approvals = [], onCoSign, onDecline, go } = {}) {
+  const pending = approvals.filter((a) => a.status === "pending" || a.status === "signing");
+  const resolved = approvals.filter((a) => a.status === "approved" || a.status === "declined");
+  return (
+    <div className="scroll" style={{ overflowY: "auto", height: "100%" }}>
+      <div style={{ maxWidth: 920, margin: "0 auto", padding: "30px 28px 64px" }}>
+        <span className="tag" style={{ color: "var(--accent)" }}>MIDEN GUARDIAN · OPENZEPPELIN</span>
+        <h1 style={{ fontFamily: "var(--disp)", fontWeight: 700, fontSize: 30, letterSpacing: "-0.02em", color: "var(--text)", margin: "10px 0 6px" }}>Guardian approvals</h1>
+        <p style={{ fontSize: 14.5, color: "var(--muted)", margin: "0 0 24px", maxWidth: 620 }}>When an agent wants to act beyond its risk cap, it can't sign alone. The trade waits here for a human co-sign — a real 2-of-N multisig, verified on-chain by the Guardian, before any capital is authorized.</p>
+
+        {approvals.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--faint)", border: "1px dashed var(--hair-2)", borderRadius: "var(--r)" }}>
+            <window.Icon name="shield-check" size={26} color="var(--faint)" style={{ margin: "0 auto 12px" }} />
+            <div style={{ fontSize: 14 }}>No co-sign requests. Open <b style={{ color: "var(--muted)", cursor: "pointer" }} onClick={() => go && go("agents")}>Agents</b> and request an above-cap trade to see the flow.</div>
+          </div>
+        ) : null}
+
+        {pending.length ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: resolved.length ? 28 : 0 }}>
+            {pending.map((ap) => <ApprovalRow key={ap.id} ap={ap} onCoSign={onCoSign} onDecline={onDecline} />)}
+          </div>
+        ) : null}
+
+        {resolved.length ? (
+          <>
+            <div className="tag" style={{ color: "var(--faint)", marginBottom: 12 }}>HISTORY</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              {resolved.map((ap) => <ApprovalRow key={ap.id} ap={ap} onCoSign={onCoSign} onDecline={onDecline} />)}
+            </div>
+          </>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+Object.assign(window, { PositionsScreen, AgentsScreen, ApprovalsScreen });

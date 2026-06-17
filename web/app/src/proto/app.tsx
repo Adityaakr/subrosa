@@ -324,6 +324,8 @@ function App() {
   const [route, setRoute] = React.useState("markets");
   const [market, setMarket] = React.useState(null);
   const [positions, setPositions] = React.useState(() => window.OBS.positions.map((p) => ({ ...p })));
+  const [agents, setAgents] = React.useState(() => window.OBS.agents.map((a) => ({ ...a })));
+  const [approvals, setApprovals] = React.useState([]); // {id, agentId, agentName, marketName, side, requested, cap, status, step, multisig}
   const [seal, setSeal] = React.useState(null); // {order}
   const [realTx, setRealTx] = React.useState(null); // {tx, account}
   const committed = React.useRef(false);
@@ -409,6 +411,35 @@ function App() {
 
   const go = (r) => { if (r !== "detail") setMarket(null); setRoute(r); };
   const openMarket = (m) => { setMarket(m); setRoute("detail"); };
+
+  // ── In-app Guardian approvals ─────────────────────────────────────────────
+  // An agent that wants to deploy beyond its programmable-auth cap can't act
+  // alone: it raises a request that a human must co-sign (2-of-N, Guardian-
+  // verified) in the UI before the capital is authorized. proposeAboveCap()
+  // queues that request; coSignApproval() runs the REAL Guardian co-sign.
+  const proposeAboveCap = (agent) => {
+    const m = (window.OBS.markets && window.OBS.markets[0]) || { name: "live market" };
+    const requested = Math.round(agent.cap * 1.6);
+    const id = "ap-" + Math.random().toString(36).slice(2, 7);
+    setApprovals((xs) => [{ id, agentId: agent.id, agentName: agent.name, marketName: m.name, side: "YES", requested, cap: agent.cap, status: "pending", step: null, multisig: null }, ...xs]);
+    setRoute("approvals");
+    window.txToast?.({ kind: "cosign", title: "Co-sign required", desc: `${agent.name} wants ${requested} OBX — over its ${agent.cap} OBX cap. Approve it under Approvals.` });
+  };
+  const coSignApproval = async (ap) => {
+    setApprovals((xs) => xs.map((x) => (x.id === ap.id ? { ...x, status: "signing", step: "Connecting to Guardian…" } : x)));
+    window.txToast?.({ kind: "cosign", title: "Guardian co-signing… (2-of-N)", desc: "Agent + your signature, verified by Guardian — this takes ~1–2 min." });
+    try {
+      const r = await guardianCoSign((msg) => setApprovals((xs) => xs.map((x) => (x.id === ap.id ? { ...x, step: msg } : x))));
+      setApprovals((xs) => xs.map((x) => (x.id === ap.id ? { ...x, status: "approved", step: null, multisig: r.multisig } : x)));
+      setAgents((as) => as.map((a) => (a.id === ap.agentId ? { ...a, deployed: a.deployed + ap.requested } : a)));
+      window.txToast?.({ kind: "tx", title: "Guardian co-signed ✓", desc: `2-of-N approved — ${ap.agentName} authorized for ${ap.requested} OBX (multisig ${shortHex(r.multisig)}).`, account: r.multisig });
+    } catch (e) {
+      console.warn("[approval] co-sign failed:", e);
+      setApprovals((xs) => xs.map((x) => (x.id === ap.id ? { ...x, status: "pending", step: null } : x)));
+      window.txToast?.({ kind: "error", title: "Guardian co-sign failed", desc: "Position not authorized. Is the Guardian server running (npm run guardian:up)?" });
+    }
+  };
+  const declineApproval = (id) => setApprovals((xs) => xs.map((x) => (x.id === id ? { ...x, status: "declined", step: null } : x)));
 
   // Redeem a winning position on a resolved market. v1 settlement is resolver-
   // run (operator redeem-service); the contract's redeem() guard only succeeds
@@ -580,7 +611,8 @@ function App() {
   let screen;
   if (route === "detail" && market) screen = <window.MarketDetail m={market} go={go} onPlace={place} balance={liveBalance} liveMarkets={live} />;
   else if (route === "positions") screen = <window.PositionsScreen positions={positions} balance={liveBalance} go={go} live={live} onRedeem={redeem} />;
-  else if (route === "agents") screen = <window.AgentsScreen />;
+  else if (route === "agents") screen = <window.AgentsScreen agents={agents} onPropose={proposeAboveCap} />;
+  else if (route === "approvals") screen = <window.ApprovalsScreen approvals={approvals} onCoSign={coSignApproval} onDecline={declineApproval} go={go} />;
   else screen = <window.MarketsHome onOpen={openMarket} liveMarkets={live} />;
 
   const topLeft = route === "detail"
@@ -593,7 +625,7 @@ function App() {
 
   return (
     <div style={{ display: "flex", height: "100vh", position: "relative", zIndex: 1 }}>
-      <window.Sidebar route={route} go={go} positionsCount={positions.length} />
+      <window.Sidebar route={route} go={go} positionsCount={positions.length} approvalsCount={approvals.filter((a) => a.status === "pending").length} />
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
         <window.TopBar left={topLeft} wallet={wallet} />
         <div className="content-scroll" style={{ flex: 1, minHeight: 0 }}>{screen}</div>
