@@ -140,8 +140,8 @@ function PrivacySeal({ order, publicYes, realTx, onView, onClose }) {
             <RedactField label="SHARES" value={order.shares.toFixed(1)} sealing={sealing} revealed={phase === "done"} />
           </div>
           <div style={{ borderTop: "1px solid var(--hair)", paddingTop: 12, display: "flex", flexDirection: "column", gap: 9 }}>
-            <HashRow label="Position commitment" priv hint="The on-chain commitment of your private position — reveals nothing about side or size" value={realTx && realTx.noteId} pending={sealing ? "sealing…" : "—"} />
-            <HashRow label="Transaction" pub value={realTx && realTx.tx} href={realTx && `https://testnet.midenscan.com/tx/${realTx.tx}`} pending={sealing ? "writing on-chain…" : "—"} />
+            <HashRow label="Position commitment" priv hint="The on-chain commitment of your private position — reveals nothing about side or size" value={realTx && realTx.noteId} pending={realTx ? "—" : "sealing…"} />
+            <HashRow label="Transaction" pub value={realTx && realTx.tx} href={realTx && realTx.tx && /^0x[0-9a-f]+$/i.test(String(realTx.tx)) ? `https://testnet.midenscan.com/tx/${realTx.tx}` : null} pending={realTx ? "—" : "writing on-chain…"} />
             {realTx && realTx.coSignMultisig ? (
               <HashRow label="Guardian co-sign · 2-of-N" pub value={realTx.coSignMultisig} href={`https://testnet.midenscan.com/account/${realTx.coSignMultisig}`} />
             ) : null}

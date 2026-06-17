@@ -287,7 +287,7 @@ function useMidenFi() {
     connected: a.connected, connecting: a.connecting,
     address: a.address, balance, balanceLabel: formatAssetAmount(balance, FUND_DECIMALS),
     connect, disconnect: a.disconnect,
-    requestSend: a.requestSend, requestConsumableNotes: a.requestConsumableNotes, requestConsume: a.requestConsume,
+    requestSend: a.requestSend, waitForTransaction: a.waitForTransaction, requestConsumableNotes: a.requestConsumableNotes, requestConsume: a.requestConsume,
     refreshAssets, refresh: () => setTick((t) => t + 1),
   };
 }
@@ -464,16 +464,31 @@ function App() {
           const faucetHex = (() => { try { return localStorage.getItem(FAUCET_LS); } catch (e) { return null; } })();
           if (!faucetHex) throw new Error("Fund your Miden Wallet first (no OBX faucet)");
           window.txToast?.({ kind: "cosign", title: "Approve in Miden Wallet", desc: "Confirm the transaction in your wallet extension to stake your OBX." });
-          const sres = await mf.requestSend({
+          // requestSend resolves to a request id (a UUID), NOT the on-chain tx
+          // hash. waitForTransaction blocks until the extension proves + submits,
+          // then returns { txHash, outputNotes } — the real Miden tx hash and the
+          // private output note (our position commitment).
+          const reqId = await mf.requestSend({
             senderAddress: mf.address,
             recipientAddress: marketHex,
             faucetId: faucetHex,
             noteType: "private",
             amount: Number(parseAssetAmount(String(order.amount), FUND_DECIMALS)),
           });
-          const tx = sres?.transactionId ?? sres?.txId ?? (typeof sres === "string" ? sres : null);
-          setRealTx({ tx, account: mf.address, marketHex, noteId: null, coSignMultisig, viaMidenFi: true });
-          setPositions((ps) => ps.map((p) => (p.id === placeId ? { ...p, tx, account: mf.address, marketAccount: marketHex, coSignMultisig, commitment: tx ? shortHex(tx) : p.commitment } : p)));
+          window.txToast?.({ kind: "cosign", title: "Settling on-chain…", desc: "Your Miden Wallet is proving + submitting the transaction." });
+          let tx = null, noteId = null;
+          try {
+            const out = await mf.waitForTransaction?.(reqId, 180_000);
+            if (out?.errorMessage) throw new Error(out.errorMessage);
+            tx = out?.txHash ?? null;
+            const notes = out?.outputNotes;
+            const first = Array.isArray(notes) ? notes[0] : null;
+            noteId = (first && (typeof first === "string" ? first : (first.id?.()?.toString?.() ?? String(first)))) || null;
+          } catch (e) {
+            console.warn("[place:midenfi] waitForTransaction:", e?.message || e);
+          }
+          setRealTx({ tx, account: mf.address, marketHex, noteId, coSignMultisig, viaMidenFi: true });
+          setPositions((ps) => ps.map((p) => (p.id === placeId ? { ...p, tx, account: mf.address, marketAccount: marketHex, coSignMultisig, commitment: noteId ? shortHex(noteId) : (tx ? shortHex(tx) : p.commitment) } : p)));
           setTimeout(() => { try { mf.refreshAssets?.(); } catch (e) {} }, 3000);
           window.txToast?.({ kind: "tx", title: `${order.side} position placed · ${order.amount} OBX (Miden Wallet)`, desc: "Signed by your Miden Wallet and staked to the market — balance debited from your external wallet.", tx, account: mf.address });
         } catch (e) {
