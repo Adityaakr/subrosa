@@ -660,7 +660,7 @@ function App() {
   return (
     <div className="app-shell" style={{ display: "flex", height: "100vh", position: "relative", zIndex: 1 }}>
       <window.Sidebar route={route} go={go} positionsCount={positions.length} approvalsCount={approvals.filter((a) => a.status === "pending").length} />
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0 }}>
         <window.TopBar left={topLeft} wallet={wallet} />
         <div className="content-scroll" style={{ flex: 1, minHeight: 0 }}>{screen}</div>
       </div>
