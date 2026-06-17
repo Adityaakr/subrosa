@@ -20,6 +20,15 @@ const WALLET_LS = "subrosa.wallet.id";
 const FAUCET_LS = "subrosa.faucet.v2.id";
 const FUND_DECIMALS = 8;
 
+// Guardian co-sign creates 2-of-N MULTISIG accounts in the SAME IndexedDB the
+// built-in wallet uses. We record their ids so the wallet never adopts one as
+// "your wallet" (a multisig can't be single-signed → funding/placing fail with
+// "transaction is unauthorized").
+const COSIGN_IDS_LS = "subrosa.cosign.ids";
+const readCoSignIds = () => { try { return JSON.parse(localStorage.getItem(COSIGN_IDS_LS) || "[]"); } catch (e) { return []; } };
+const addCoSignId = (id) => { try { const s = new Set(readCoSignIds()); if (id) s.add(String(id)); localStorage.setItem(COSIGN_IDS_LS, JSON.stringify([...s])); } catch (e) {} };
+const isCoSignId = (id) => { try { return id && readCoSignIds().some((x) => String(x).toLowerCase() === String(id).toLowerCase()); } catch (e) { return false; } };
+
 // Public storage slots exported by the market component (read for live odds).
 const SLOT_YES = "miden_market::market::yes_reserve";
 const SLOT_NO = "miden_market::market::no_reserve";
@@ -120,7 +129,11 @@ function useWallet() {
 
   // Resolve the connected account OBJECT from the store by its persisted id —
   // far more reliable than re-deriving it from a string each render.
-  const stored = React.useMemo(() => (walletId ? list.find((a) => sameId(a, walletId)) || null : null), [walletId, list]);
+  const stored = React.useMemo(() => {
+    if (!walletId || isCoSignId(walletId)) return null; // ignore a co-sign multisig id
+    const a = list.find((x) => sameId(x, walletId)) || null;
+    return a && !isCoSignId(idOf(a)) ? a : null;
+  }, [walletId, list]);
   const acctRef = React.useRef(null);
   React.useEffect(() => { if (stored) acctRef.current = stored; }, [stored]);
   const account = stored || acctRef.current;
@@ -134,8 +147,9 @@ function useWallet() {
   // Once the store list has loaded, drop a persisted id that no longer exists
   // (e.g. the IndexedDB was reset) — but never wipe a freshly created wallet.
   React.useEffect(() => {
-    if (walletId && !listLoading && !stored && !acctRef.current) {
+    if (walletId && (isCoSignId(walletId) || (!listLoading && !stored && !acctRef.current))) {
       try { localStorage.removeItem(WALLET_LS); } catch (e) {}
+      acctRef.current = null;
       setWalletId(null);
     }
   }, [walletId, listLoading, stored]);
@@ -147,8 +161,10 @@ function useWallet() {
     if (account) return account;
     setConnecting(true);
     try {
-      // adopt an existing wallet from the store, else create a fresh one
-      let w = (wallets && wallets[0]) || (accounts && accounts[0]) || null;
+      // Reuse the persisted wallet if it's still in the store; otherwise create
+      // a FRESH basic wallet. Never adopt arbitrary store accounts — co-sign
+      // multisigs live in the same IndexedDB and must not become "your wallet".
+      let w = (walletId && !isCoSignId(walletId) && list.find((a) => sameId(a, walletId))) || null;
       if (!w) w = await createWallet({ storageMode: "private" });
       acctRef.current = w;
       try { localStorage.setItem(WALLET_LS, idOf(w)); } catch (e) {}
@@ -487,6 +503,7 @@ function App() {
     setCoSignStep("Connecting to Guardian…");
     try {
       const r = await guardianCoSign((msg) => { setCoSignStep(msg); setApprovals((xs) => xs.map((x) => (x.id === ap.id ? { ...x, step: msg } : x))); });
+      addCoSignId(r.multisig); // never let the wallet adopt this multisig
       setCoSignStep(null);
       setApprovals((xs) => xs.map((x) => (x.id === ap.id ? { ...x, status: "approved", step: null, multisig: r.multisig } : x)));
       setAgents((as) => as.map((a) => (a.id === ap.agentId ? { ...a, deployed: a.deployed + ap.requested } : a)));
@@ -535,6 +552,7 @@ function App() {
         try {
           const r = await guardianCoSign((m) => { console.log("[cosign]", m); setCoSignStep(m); });
           coSignMultisig = r.multisig;
+          addCoSignId(r.multisig); // never let the wallet adopt this multisig
           setCoSignStep(null);
           window.txToast?.({ kind: "cosign", title: "Guardian co-signed ✓", desc: `2-of-N approved (multisig ${shortHex(coSignMultisig)}). Sealing your position…`, account: coSignMultisig });
         } catch (e) {
