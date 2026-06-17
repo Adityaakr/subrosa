@@ -375,6 +375,7 @@ function App() {
   const [positions, setPositions] = React.useState(() => window.OBS.positions.map((p) => ({ ...p })));
   const [agents, setAgents] = React.useState(() => window.OBS.agents.map((a) => ({ ...a })));
   const [approvals, setApprovals] = React.useState([]); // {id, agentId, agentName, marketName, side, requested, cap, status, step, multisig}
+  const [coSignStep, setCoSignStep] = React.useState(null); // live Guardian co-sign progress (null = idle)
   const [seal, setSeal] = React.useState(null); // {order}
   const [realTx, setRealTx] = React.useState(null); // {tx, account}
   const committed = React.useRef(false);
@@ -476,14 +477,16 @@ function App() {
   };
   const coSignApproval = async (ap) => {
     setApprovals((xs) => xs.map((x) => (x.id === ap.id ? { ...x, status: "signing", step: "Connecting to Guardian…" } : x)));
-    window.txToast?.({ kind: "cosign", title: "Guardian co-signing… (2-of-N)", desc: "Agent + your signature, verified by Guardian — this takes ~1–2 min." });
+    setCoSignStep("Connecting to Guardian…");
     try {
-      const r = await guardianCoSign((msg) => setApprovals((xs) => xs.map((x) => (x.id === ap.id ? { ...x, step: msg } : x))));
+      const r = await guardianCoSign((msg) => { setCoSignStep(msg); setApprovals((xs) => xs.map((x) => (x.id === ap.id ? { ...x, step: msg } : x))); });
+      setCoSignStep(null);
       setApprovals((xs) => xs.map((x) => (x.id === ap.id ? { ...x, status: "approved", step: null, multisig: r.multisig } : x)));
       setAgents((as) => as.map((a) => (a.id === ap.agentId ? { ...a, deployed: a.deployed + ap.requested } : a)));
       window.txToast?.({ kind: "tx", title: "Guardian co-signed ✓", desc: `2-of-N approved — ${ap.agentName} authorized for ${ap.requested} OBX (multisig ${shortHex(r.multisig)}).`, account: r.multisig });
     } catch (e) {
       console.warn("[approval] co-sign failed:", e);
+      setCoSignStep(null);
       setApprovals((xs) => xs.map((x) => (x.id === ap.id ? { ...x, status: "pending", step: null } : x)));
       window.txToast?.({ kind: "error", title: "Guardian co-sign failed", desc: "Position not authorized. Is the Guardian server running (npm run guardian:up)?" });
     }
@@ -521,13 +524,15 @@ function App() {
     (async () => {
       let coSignMultisig = null;
       if (order.protect) {
-        window.txToast?.({ kind: "cosign", title: "Guardian co-signing… (2-of-N)", desc: "Collecting a Guardian co-sign before your bet lands — this takes ~1–2 min." });
+        setCoSignStep("Connecting to Guardian…");
         try {
-          const r = await guardianCoSign((m) => console.log("[cosign]", m));
+          const r = await guardianCoSign((m) => { console.log("[cosign]", m); setCoSignStep(m); });
           coSignMultisig = r.multisig;
+          setCoSignStep(null);
           window.txToast?.({ kind: "cosign", title: "Guardian co-signed ✓", desc: `2-of-N approved (multisig ${shortHex(coSignMultisig)}). Sealing your position…`, account: coSignMultisig });
         } catch (e) {
           console.warn("[cosign] failed:", e);
+          setCoSignStep(null);
           window.txToast?.({ kind: "error", title: "Guardian co-sign failed", desc: "Position not placed. Is the Guardian server running (npm run guardian:up)?" });
           return;
         }
@@ -701,6 +706,7 @@ function App() {
         />
       ) : null}
       <window.ToastHost />
+      <window.CoSignModal step={coSignStep} />
     </div>
   );
 }

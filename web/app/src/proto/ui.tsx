@@ -327,4 +327,65 @@ function ToastHost() {
   );
 }
 
-Object.assign(window, { fmtUsd, fmtPct, StatusTag, Chip, Btn, Sparkline, OddsBar, useLiveOdds, Cat, Sidebar, TopBar, ToastHost, txToast });
+/* ---------- Guardian co-sign progress (the ~1–2 min flow) ---------- */
+const COSIGN_STEPS = [
+  { label: "Connecting to Guardian", desc: "Reaching your self-hosted Guardian server.", m: /connect/i },
+  { label: "Creating the 2-of-N multisig", desc: "A fresh multisig account — agent + you, Guardian-verified.", m: /creat|multisig/i },
+  { label: "Collecting signatures", desc: "Agent signs, then your signature (2-of-N).", m: /collect|signatur/i },
+  { label: "Executing on-chain", desc: "Proving + submitting the co-signed transaction to Miden.", m: /execut|on-chain/i },
+];
+
+function Elapsed({ since }) {
+  const [, force] = useState(0);
+  useEffect(() => { const i = setInterval(() => force((x) => x + 1), 1000); return () => clearInterval(i); }, []);
+  const s = Math.max(0, Math.floor((Date.now() - since) / 1000));
+  return <>{Math.floor(s / 60)}:{String(s % 60).padStart(2, "0")}</>;
+}
+
+// step = the live onStep string from guardianCoSign (null = hidden).
+function CoSignModal({ step }) {
+  const startRef = useRef(0);
+  if (step && !startRef.current) startRef.current = Date.now();
+  if (!step) { startRef.current = 0; return null; }
+  const active = Math.max(0, COSIGN_STEPS.findIndex((x) => x.m.test(step)));
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 120, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(16,16,18,0.55)", backdropFilter: "blur(8px)", animation: "fadeIn 0.2s ease both", padding: 18 }}>
+      <div style={{ width: "min(420px, 94vw)", background: "var(--glass)", backdropFilter: "blur(20px)", border: "1px solid var(--hair-2)", borderRadius: 20, padding: 24, boxShadow: "0 40px 100px rgba(12,12,14,0.3)", animation: "scaleIn 0.28s cubic-bezier(0.22,1,0.36,1) both" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 9 }}>
+            <span style={{ width: 30, height: 30, borderRadius: 9, background: "var(--accent-dim)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <window.Icon name="shield-check" size={17} color="var(--accent)" />
+            </span>
+            <span style={{ fontFamily: "var(--disp)", fontWeight: 700, fontSize: 16, color: "var(--text)" }}>Guardian co-sign · 2-of-N</span>
+          </span>
+          <span className="mono" style={{ fontSize: 13, color: "var(--accent)", fontWeight: 500 }}><Elapsed since={startRef.current} /></span>
+        </div>
+        <p style={{ margin: "0 0 16px", fontSize: 12.5, lineHeight: 1.5, color: "var(--muted)" }}>A real 2-of-N multisig is being created and co-signed on Miden — this is genuine on-chain work, so it takes about <b style={{ color: "var(--text)" }}>1–2 minutes</b>.</p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {COSIGN_STEPS.map((s, i) => {
+            const done = i < active, now = i === active;
+            return (
+              <div key={i} style={{ display: "flex", gap: 11, alignItems: "flex-start", opacity: done || now ? 1 : 0.45 }}>
+                <span style={{ width: 20, height: 20, borderRadius: "50%", flex: "none", marginTop: 1, display: "flex", alignItems: "center", justifyContent: "center", background: done ? "var(--yes)" : now ? "var(--accent)" : "var(--surface-2)", border: now ? "none" : done ? "none" : "1px solid var(--hair-2)" }}>
+                  {done ? <window.Icon name="check" size={12} color="#fff" />
+                    : now ? <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#fff", animation: "blink 1.1s infinite" }} />
+                    : <span className="mono" style={{ fontSize: 10, color: "var(--faint)" }}>{i + 1}</span>}
+                </span>
+                <span style={{ minWidth: 0 }}>
+                  <span style={{ display: "block", fontSize: 13.5, fontWeight: now ? 600 : 500, color: done || now ? "var(--text)" : "var(--faint)" }}>{s.label}{now ? "…" : ""}</span>
+                  <span style={{ display: "block", fontSize: 11.5, color: "var(--faint)", marginTop: 1 }}>{s.desc}</span>
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ marginTop: 16, paddingTop: 13, borderTop: "1px solid var(--hair)", display: "flex", alignItems: "center", gap: 7 }}>
+          <window.Icon name="key-round" size={13} color="var(--faint)" />
+          <span style={{ fontSize: 11.5, color: "var(--faint)" }}>Keep this tab open — closing it cancels the co-sign.</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+Object.assign(window, { fmtUsd, fmtPct, StatusTag, Chip, Btn, Sparkline, OddsBar, useLiveOdds, Cat, Sidebar, TopBar, ToastHost, txToast, CoSignModal });
