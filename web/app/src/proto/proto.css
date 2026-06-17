@@ -108,9 +108,13 @@ input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 4
   .sidebar-foot { display: none !important; }
   .sidebar-logo { padding: 4px 6px 4px 2px !important; flex: none !important; }
 
-  /* topbar: tighter; drop the decorative search box */
-  .topbar { height: 52px !important; padding: 0 14px !important; gap: 8px !important; }
+  /* topbar: tighter; drop the breadcrumb + decorative search; compact wallet */
+  .topbar { height: 52px !important; padding: 0 12px !important; gap: 8px !important; }
   .topbar-search { display: none !important; }
+  .topbar-left { display: none !important; }          /* nav bar already shows the section */
+  .topbar-right { gap: 8px !important; margin-left: 0 !important; width: 100%; justify-content: flex-end; }
+  .fund-label { display: none !important; }            /* Fund → icon only */
+  .fund-btn { padding: 0 11px !important; }
 
   /* page containers + hero */
   .page { padding: 18px 14px 56px !important; }
