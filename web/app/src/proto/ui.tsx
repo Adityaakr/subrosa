@@ -150,15 +150,15 @@ function Sidebar({ route, go, positionsCount, approvalsCount }) {
   ];
   const active = (k) => route === k || (k === "markets" && route === "detail");
   return (
-    <aside style={{ width: 234, flex: "none", borderRight: "1px solid var(--hair)", background: "var(--surface)", display: "flex", flexDirection: "column", padding: "20px 16px", position: "relative", zIndex: 2 }}>
-      <div style={{ display: "flex", alignItems: "center", padding: "4px 8px 22px" }}>
+    <aside className="sidebar" style={{ width: 234, flex: "none", borderRight: "1px solid var(--hair)", background: "var(--surface)", display: "flex", flexDirection: "column", padding: "20px 16px", position: "relative", zIndex: 2 }}>
+      <div className="sidebar-logo" style={{ display: "flex", alignItems: "center", padding: "4px 8px 22px" }}>
         <img className="logo-on-light" src="/logo/subrosa-wordmark-dark.svg" alt="Subrosa" height="24" />
         <img className="logo-on-dark" src="/logo/subrosa-wordmark-light.svg" alt="Subrosa" height="24" />
       </div>
       <nav style={{ display: "flex", flexDirection: "column", gap: 3 }}>
         {items.map((it) => <NavBtn key={it.k} it={it} on={active(it.k)} onClick={() => go(it.k)} />)}
       </nav>
-      <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
+      <div className="sidebar-foot" style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
         <div style={{ padding: 12, borderRadius: "var(--r-md)", border: "1px solid var(--hair)", background: "var(--surface-2)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 7 }}>
             <window.Icon name="shield-check" size={14} color="var(--accent)" />
@@ -223,11 +223,11 @@ function TopBar({ left, wallet }) {
   const w = wallet || {};
   const [chooserOpen, setChooserOpen] = React.useState(false);
   return (
-    <header style={{ position: "sticky", top: 0, zIndex: 5, display: "flex", alignItems: "center", gap: 16, height: 60, padding: "0 28px", borderBottom: "1px solid var(--hair)", background: "var(--glass)", backdropFilter: "blur(14px)" }}>
+    <header className="topbar" style={{ position: "sticky", top: 0, zIndex: 5, display: "flex", alignItems: "center", gap: 16, height: 60, padding: "0 28px", borderBottom: "1px solid var(--hair)", background: "var(--glass)", backdropFilter: "blur(14px)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>{left}</div>
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 14 }}>
         <ThemeToggle />
-        <div style={{ display: "flex", alignItems: "center", gap: 8, height: 36, padding: "0 12px", borderRadius: "var(--r-md)", border: "1px solid var(--hair)", background: "var(--surface)", width: 200 }}>
+        <div className="topbar-search" style={{ display: "flex", alignItems: "center", gap: 8, height: 36, padding: "0 12px", borderRadius: "var(--r-md)", border: "1px solid var(--hair)", background: "var(--surface)", width: 200 }}>
           <window.Icon name="search" size={15} color="var(--faint)" />
           <span style={{ fontSize: 13, color: "var(--faint)" }}>Search markets</span>
           <span className="mono" style={{ marginLeft: "auto", fontSize: 10.5, color: "var(--faint)", border: "1px solid var(--hair-2)", borderRadius: 5, padding: "1px 5px" }}>/</span>

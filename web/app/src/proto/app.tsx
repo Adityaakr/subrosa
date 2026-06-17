@@ -658,7 +658,7 @@ function App() {
     : <span style={{ fontFamily: "var(--disp)", fontWeight: 700, fontSize: 16, color: "var(--text)", textTransform: "capitalize" }}>{route}</span>;
 
   return (
-    <div style={{ display: "flex", height: "100vh", position: "relative", zIndex: 1 }}>
+    <div className="app-shell" style={{ display: "flex", height: "100vh", position: "relative", zIndex: 1 }}>
       <window.Sidebar route={route} go={go} positionsCount={positions.length} approvalsCount={approvals.filter((a) => a.status === "pending").length} />
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
         <window.TopBar left={topLeft} wallet={wallet} />

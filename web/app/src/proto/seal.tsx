@@ -84,7 +84,7 @@ function PrivacySeal({ order, publicYes, realTx, onView, onClose }) {
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(16,16,18,0.55)", backdropFilter: "blur(8px)", animation: "fadeIn 0.25s ease both" }}>
-      <div style={{ width: 440, background: "var(--glass)", backdropFilter: "blur(20px)", border: "1px solid var(--hair-2)", borderRadius: 20, padding: 28, boxShadow: "0 40px 100px rgba(12,12,14,0.3)", animation: "scaleIn 0.3s cubic-bezier(0.22,1,0.36,1) both", position: "relative", overflow: "hidden" }}>
+      <div className="seal-card" style={{ width: 440, background: "var(--glass)", backdropFilter: "blur(20px)", border: "1px solid var(--hair-2)", borderRadius: 20, padding: 28, boxShadow: "0 40px 100px rgba(12,12,14,0.3)", animation: "scaleIn 0.3s cubic-bezier(0.22,1,0.36,1) both", position: "relative", overflow: "hidden" }}>
         {/* close */}
         {phase === "done" ? (
           <button onClick={onClose} style={{ position: "absolute", top: 16, right: 16, width: 30, height: 30, borderRadius: 8, border: "1px solid var(--hair)", background: "var(--surface)", color: "var(--muted)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 3 }}>

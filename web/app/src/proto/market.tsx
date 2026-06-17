@@ -110,9 +110,9 @@ function MarketsHome({ onOpen, liveMarkets }) {
   const shown = f === "All" ? base : base.filter((m) => m.category === f);
   return (
     <div className="scroll" style={{ overflowY: "auto", height: "100%" }}>
-      <div style={{ maxWidth: 1160, margin: "0 auto", padding: "30px 28px 64px" }}>
+      <div className="page" style={{ maxWidth: 1160, margin: "0 auto", padding: "30px 28px 64px" }}>
         {/* hero band */}
-        <div style={{ position: "relative", display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 26 }}>
+        <div className="hero-band" style={{ position: "relative", display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 26 }}>
           <HeroHalftone />
           <div style={{ position: "relative", zIndex: 1 }}>
             <span className="tag" style={{ color: "var(--accent)" }}>PRIVATE PREDICTION MARKETS · ON MIDEN</span>
@@ -140,7 +140,7 @@ function MarketsHome({ onOpen, liveMarkets }) {
         </div>
 
         {/* grid */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+        <div className="grid-markets" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
           {shown.map((m) => (
             <MarketTile key={m.id} m={m} onOpen={onOpen} />
           ))}
@@ -386,12 +386,12 @@ function MarketDetail({ m: m0, go, onPlace, balance, liveMarkets, addresses }) {
 
   return (
     <div className="scroll" style={{ overflowY: "auto", height: "100%" }}>
-      <div style={{ maxWidth: 1160, margin: "0 auto", padding: "22px 28px 64px" }}>
+      <div className="page" style={{ maxWidth: 1160, margin: "0 auto", padding: "22px 28px 64px" }}>
         <button onClick={() => go("markets")} style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "none", border: "none", cursor: "pointer", color: "var(--muted)", fontSize: 13.5, marginBottom: 20, padding: 0 }}>
           <window.Icon name="arrow-left" size={16} /> All markets
         </button>
 
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 360px", gap: 24, alignItems: "start" }}>
+        <div className="grid-detail" style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 360px", gap: 24, alignItems: "start" }}>
           {/* LEFT */}
           <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
             <div>
@@ -446,7 +446,7 @@ function MarketDetail({ m: m0, go, onPlace, balance, liveMarkets, addresses }) {
             </div>
 
             {/* stats — real for live markets */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
+            <div className="grid-stats" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
               {(isLive
                 ? [["Volume", m.volume, "activity"], ["Liquidity", m.liquidity, "droplet"], ["Resolution", resLabel, "shield-check"], ["Source", "On-chain", "radio"]]
                 : [["Volume", m.volume, "activity"], ["Liquidity", m.liquidity, "droplet"], ["Resolves", m.closes, "clock"], ["Status", "Preview", "clock"]]
@@ -460,7 +460,7 @@ function MarketDetail({ m: m0, go, onPlace, balance, liveMarkets, addresses }) {
             </div>
 
             {/* two-up: resolution + live trades */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            <div className="grid-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
               <div style={{ background: "var(--surface)", border: "1px solid var(--hair)", borderRadius: "var(--r)", padding: 18 }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>

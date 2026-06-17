@@ -146,6 +146,31 @@
     .wrap{padding:0 22px;}
     .navlinks{display:none;}
   }
+  /* phones */
+  @media (max-width:640px){
+    .wrap{padding:0 16px;}
+    nav.top .row{height:60px;gap:12px;}
+    nav.top .builton{display:none;}  /* free up nav width on phones */
+    nav.top .btn{height:40px;padding:0 14px;font-size:14px;}
+    .hero{padding:32px 0 0;}
+    #halftone{height:300px;}
+    .hero h1{font-size:clamp(40px,12vw,66px);}
+    .hero-sub{gap:20px;}
+    .hero-sub p{font-size:17px;}
+    .hero-cta{flex-wrap:wrap;}
+    .hero-cta .btn{flex:1 1 auto;justify-content:center;}
+    .stats{margin-top:48px;}
+    .stat{padding:22px 20px;}
+    .band .row{flex-direction:column;align-items:flex-start;gap:8px;padding:20px;}
+    section.block{padding:48px 0;}
+    .feat{gap:32px;}
+    /* keep the comparison aligned but compact so it fits a phone */
+    .cmp .h,.cmp .r{grid-template-columns:1.4fr .9fr auto .9fr;gap:8px;padding:13px 14px;}
+    .cmp .attr{font-size:14px;}
+    .cmp .pub,.cmp .prv{font-size:12.5px;}
+    .cta .inner{padding:56px 20px;}
+    .cta p{font-size:16px;}
+  }
 </style>
 </head>
 <body>

@@ -27,7 +27,7 @@ function PositionRow({ pos, last, resolution, onRedeem }) {
   const win = pos.pnl >= 0;
   const won = resolution && ((resolution === 1 && pos.side === "YES") || (resolution === 2 && pos.side === "NO"));
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "2.3fr 0.7fr 0.8fr 1fr 1fr 1.4fr", gap: 14, alignItems: "center", padding: "16px 20px", borderBottom: last ? "none" : "1px solid var(--hair)" }}>
+    <div className="pos-row" style={{ display: "grid", gridTemplateColumns: "2.3fr 0.7fr 0.8fr 1fr 1fr 1.4fr", gap: 14, alignItems: "center", padding: "16px 20px", borderBottom: last ? "none" : "1px solid var(--hair)" }}>
       <div style={{ minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
           <window.Cat name={m.category} />
@@ -81,7 +81,7 @@ function PositionsScreen({ positions, balance, go, live, onRedeem }) {
 
   return (
     <div className="scroll" style={{ overflowY: "auto", height: "100%" }}>
-      <div style={{ maxWidth: 1160, margin: "0 auto", padding: "30px 28px 64px" }}>
+      <div className="page" style={{ maxWidth: 1160, margin: "0 auto", padding: "30px 28px 64px" }}>
         <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 24 }}>
           <div>
             <span className="tag" style={{ color: "var(--accent)" }}>YOUR PRIVATE BOOK</span>
@@ -91,15 +91,15 @@ function PositionsScreen({ positions, balance, go, live, onRedeem }) {
           <window.Btn variant="secondary" icon="plus" onClick={() => go("markets")}>New position</window.Btn>
         </div>
 
-        <div style={{ display: "flex", gap: 14, marginBottom: 22 }}>
+        <div className="summary-row" style={{ display: "flex", gap: 14, marginBottom: 22 }}>
           <SummaryCard label="Book value" value={window.fmtUsd(bookValue)} glow />
           <SummaryCard label="Unrealized P&L" value={`${pnlUsd >= 0 ? "+" : ""}${window.fmtUsd(pnlUsd)}`} sub={`${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(1)}%`} valueColor={pnlUsd >= 0 ? "var(--yes)" : "var(--no)"} />
           <SummaryCard label="Open positions" value={String(all.length)} />
           <SummaryCard label="Visible on-chain" value="0" sub="commitments only" />
         </div>
 
-        <div style={{ background: "var(--surface)", border: "1px solid var(--hair)", borderRadius: "var(--r)", overflow: "hidden" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "2.3fr 0.7fr 0.8fr 1fr 1fr 1.4fr", gap: 14, padding: "12px 20px", borderBottom: "1px solid var(--hair)", background: "var(--bg-2)" }}>
+        <div className="pos-table" style={{ background: "var(--surface)", border: "1px solid var(--hair)", borderRadius: "var(--r)", overflow: "hidden" }}>
+          <div className="pos-row" style={{ display: "grid", gridTemplateColumns: "2.3fr 0.7fr 0.8fr 1fr 1fr 1.4fr", gap: 14, padding: "12px 20px", borderBottom: "1px solid var(--hair)", background: "var(--bg-2)" }}>
             {["Market", "Side", "Size", "Avg", "Value", "Reveal publicly"].map((h, i) => (
               <span key={i} className="tag" style={{ color: "var(--faint)", justifySelf: i === 5 ? "end" : "start" }}>{h}</span>
             ))}
@@ -191,7 +191,7 @@ function AgentsScreen({ agents, onPropose } = {}) {
   const dep = A.reduce((s, a) => s + a.deployed, 0);
   return (
     <div className="scroll" style={{ overflowY: "auto", height: "100%" }}>
-      <div style={{ maxWidth: 1160, margin: "0 auto", padding: "30px 28px 64px" }}>
+      <div className="page" style={{ maxWidth: 1160, margin: "0 auto", padding: "30px 28px 64px" }}>
         <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 24 }}>
           <div>
             <span className="tag" style={{ color: "var(--agent)" }}>POLYBASKETS · CONFIDENTIAL AGENT TIER</span>
@@ -201,14 +201,14 @@ function AgentsScreen({ agents, onPropose } = {}) {
           <window.Btn variant="primary" icon="plus">Deploy agent</window.Btn>
         </div>
 
-        <div style={{ display: "flex", gap: 14, marginBottom: 22 }}>
+        <div className="summary-row" style={{ display: "flex", gap: 14, marginBottom: 22 }}>
           <SummaryCard label="Active agents" value={String(activeN)} sub={`of ${A.length} deployed`} />
           <SummaryCard label="Combined cap" value={window.fmtUsd(cap)} glow />
           <SummaryCard label="Capital deployed" value={window.fmtUsd(dep)} sub={`${Math.round((dep / cap) * 100)}% of cap`} />
           <SummaryCard label="Strategies exposed" value="0" sub="agent edge stays private" />
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        <div className="grid-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
           {A.map((a) => <AgentCard key={a.id} a={a} onPropose={onPropose} />)}
         </div>
       </div>
@@ -277,7 +277,7 @@ function ApprovalsScreen({ approvals = [], onCoSign, onDecline, go } = {}) {
   const resolved = approvals.filter((a) => a.status === "approved" || a.status === "declined");
   return (
     <div className="scroll" style={{ overflowY: "auto", height: "100%" }}>
-      <div style={{ maxWidth: 920, margin: "0 auto", padding: "30px 28px 64px" }}>
+      <div className="page" style={{ maxWidth: 920, margin: "0 auto", padding: "30px 28px 64px" }}>
         <span className="tag" style={{ color: "var(--accent)" }}>MIDEN GUARDIAN · OPENZEPPELIN</span>
         <h1 style={{ fontFamily: "var(--disp)", fontWeight: 700, fontSize: 30, letterSpacing: "-0.02em", color: "var(--text)", margin: "10px 0 6px" }}>Guardian approvals</h1>
         <p style={{ fontSize: 14.5, color: "var(--muted)", margin: "0 0 24px", maxWidth: 620 }}>When an agent wants to act beyond its risk cap, it can't sign alone. The trade waits here for a human co-sign — a real 2-of-N multisig, verified on-chain by the Guardian, before any capital is authorized.</p>

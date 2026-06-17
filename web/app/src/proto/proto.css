@@ -83,3 +83,54 @@ input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 4
 @keyframes floaty { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
 .anim-fadeup { animation: fadeUp 0.5s cubic-bezier(0.22,1,0.36,1) both; }
 @media (prefers-reduced-motion: reduce) { * { animation-duration: 0.001ms !important; transition-duration: 0.01ms !important; } }
+
+/* ─────────────────────────  Responsive  ─────────────────────────
+   All rules are media-gated, so the desktop layout (inline styles) is
+   untouched. Components only carry stable class hooks; the breakpoints
+   below do the work. */
+
+/* Tablet — drop the 3-up market grid to 2-up. */
+@media (max-width: 1024px) {
+  .grid-markets { grid-template-columns: repeat(2, 1fr) !important; }
+}
+
+/* Phone — stack everything, slim the chrome. */
+@media (max-width: 760px) {
+  /* shell: side rail → slim horizontal top bar */
+  .app-shell { flex-direction: column !important; height: 100dvh !important; }
+  .sidebar {
+    width: 100% !important; height: auto !important;
+    flex-direction: row !important; align-items: center !important;
+    border-right: none !important; border-bottom: 1px solid var(--hair) !important;
+    padding: 8px 12px !important; gap: 8px !important; overflow-x: auto !important;
+  }
+  .sidebar nav { flex-direction: row !important; gap: 4px !important; }
+  .sidebar-foot { display: none !important; }
+  .sidebar-logo { padding: 4px 6px 4px 2px !important; flex: none !important; }
+
+  /* topbar: tighter; drop the decorative search box */
+  .topbar { height: 52px !important; padding: 0 14px !important; gap: 8px !important; }
+  .topbar-search { display: none !important; }
+
+  /* page containers + hero */
+  .page { padding: 18px 14px 56px !important; }
+  .hero-band { flex-direction: column !important; align-items: flex-start !important; gap: 16px !important; }
+  .hero-band h1 { font-size: 28px !important; }
+
+  /* grids → single / paired columns */
+  .grid-markets { grid-template-columns: 1fr !important; }
+  .grid-detail  { grid-template-columns: 1fr !important; }
+  .grid-stats   { grid-template-columns: repeat(2, 1fr) !important; }
+  .grid-2       { grid-template-columns: 1fr !important; }
+
+  /* summary-card rows → wrap 2-up instead of overflowing */
+  .summary-row { flex-wrap: wrap !important; }
+  .summary-row > * { flex: 1 1 calc(50% - 14px) !important; min-width: 0 !important; }
+
+  /* positions table → scroll horizontally rather than crush 6 columns */
+  .pos-table { overflow-x: auto !important; }
+  .pos-row { min-width: 600px !important; }
+
+  /* seal modal fits the viewport */
+  .seal-card { width: 92vw !important; max-width: 440px !important; padding: 22px !important; }
+}
