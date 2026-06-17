@@ -122,6 +122,10 @@ input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 4
   .grid-detail  { grid-template-columns: 1fr !important; }
   .grid-stats   { grid-template-columns: repeat(2, 1fr) !important; }
   .grid-2       { grid-template-columns: 1fr !important; }
+  /* let the 1fr tracks collapse to the viewport — grid items default to
+     min-width:auto, which otherwise lets a child (e.g. the bet panel) blow the
+     track past the screen and get clipped by body{overflow:hidden}. */
+  .grid-markets > *, .grid-detail > *, .grid-stats > *, .grid-2 > * { min-width: 0 !important; }
 
   /* summary-card rows → wrap 2-up instead of overflowing */
   .summary-row { flex-wrap: wrap !important; }
@@ -133,4 +137,7 @@ input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 4
 
   /* seal modal fits the viewport */
   .seal-card { width: 92vw !important; max-width: 440px !important; padding: 22px !important; }
+
+  /* bet/resolved panel: don't pin it when the detail view is stacked */
+  .bet-panel { position: static !important; }
 }

@@ -250,7 +250,7 @@ function ResolvedPanel({ m, resolution }) {
   const c = resolution === 1 ? "var(--yes)" : "var(--no)";
   const bg = resolution === 1 ? "var(--yes-dim)" : "var(--no-dim)";
   return (
-    <div style={{ position: "sticky", top: 0, background: "var(--glass)", backdropFilter: "blur(14px)", border: "1px solid var(--hair-2)", borderRadius: "var(--r)", padding: 20, boxShadow: "0 20px 50px rgba(12,12,14,0.12)" }}>
+    <div className="bet-panel" style={{ position: "sticky", top: 0, background: "var(--glass)", backdropFilter: "blur(14px)", border: "1px solid var(--hair-2)", borderRadius: "var(--r)", padding: 20, boxShadow: "0 20px 50px rgba(12,12,14,0.12)" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
         <span style={{ fontFamily: "var(--disp)", fontWeight: 700, fontSize: 16, color: "var(--text)" }}>Market resolved</span>
         <span className="tag" style={{ color: c, background: bg, padding: "3px 9px", borderRadius: 999 }}>{won} WON</span>
@@ -287,7 +287,7 @@ function BetPanel({ m, balance, onPlace }) {
   if (m._resolution) return <ResolvedPanel m={m} resolution={m._resolution} />;
 
   return (
-    <div style={{ position: "sticky", top: 0, background: "var(--glass)", backdropFilter: "blur(14px)", border: "1px solid var(--hair-2)", borderRadius: "var(--r)", padding: 20, boxShadow: "0 20px 50px rgba(12,12,14,0.12)" }}>
+    <div className="bet-panel" style={{ position: "sticky", top: 0, background: "var(--glass)", backdropFilter: "blur(14px)", border: "1px solid var(--hair-2)", borderRadius: "var(--r)", padding: 20, boxShadow: "0 20px 50px rgba(12,12,14,0.12)" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
         <span style={{ fontFamily: "var(--disp)", fontWeight: 700, fontSize: 16, color: "var(--text)" }}>Place position</span>
         <window.StatusTag kind="private" />
@@ -395,7 +395,7 @@ function MarketDetail({ m: m0, go, onPlace, balance, liveMarkets, addresses }) {
           {/* LEFT */}
           <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
             <div>
-              <div style={{ display: "flex", gap: 8, marginBottom: 14, alignItems: "center" }}>
+              <div style={{ display: "flex", gap: 8, marginBottom: 14, alignItems: "center", flexWrap: "wrap" }}>
                 <window.Cat name={m.category} />
                 <window.StatusTag kind="public" />
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }} className="tag">
@@ -433,7 +433,7 @@ function MarketDetail({ m: m0, go, onPlace, balance, liveMarkets, addresses }) {
               ) : null}
               {/* verifiable on-chain market account — anyone can open it on the explorer */}
               {isLive && marketHex ? (
-                <div style={{ marginTop: 13, paddingTop: 13, borderTop: "1px solid var(--hair)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, minWidth: 0 }}>
+                <div style={{ marginTop: 13, paddingTop: 13, borderTop: "1px solid var(--hair)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, minWidth: 0, flexWrap: "wrap" }}>
                   <span className="tag" style={{ color: "var(--faint)", display: "inline-flex", alignItems: "center", gap: 5, whiteSpace: "nowrap" }}>
                     <window.Icon name="shield-check" size={12} color="var(--faint)" /> MARKET ACCOUNT
                   </span>
