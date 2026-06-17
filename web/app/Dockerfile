@@ -14,8 +14,11 @@ RUN npm run build
 FROM node:24-slim
 WORKDIR /app
 ENV NODE_ENV=production
-# bring the built app + the deps preview needs (vite)
-COPY --from=build /app /app
+# Slim runtime: only the built static site + the tiny zero-dependency server.
+# (Copying the build stage's node_modules made a multi-GB image that timed out
+# on push — the Miden SDK ships several ~14MB WASM variants.)
+COPY --from=build /app/dist ./dist
+COPY --from=build /app/serve.mjs ./serve.mjs
 EXPOSE 4173
-# $PORT is provided by Railway; GUARDIAN_URL is read by vite.config.ts at boot.
-CMD ["sh", "-c", "npm run preview -- --host 0.0.0.0 --port ${PORT:-4173}"]
+# $PORT is provided by Railway; GUARDIAN_URL is read by serve.mjs at boot.
+CMD ["node", "serve.mjs"]
