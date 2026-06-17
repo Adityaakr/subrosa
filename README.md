@@ -6,7 +6,7 @@
 
 **Private prediction markets with confidential AI agents, on [Miden](https://miden.xyz).**
 
-Public, trustworthy **odds** — but your **position, size, and P&L stay private**.
+Public, trustworthy **odds** but your **position, size, and P&L stay private**.
 The chain records only a *commitment*.
 
 [![Miden](https://img.shields.io/badge/Miden-testnet-FF5500)](https://testnet.midenscan.com)

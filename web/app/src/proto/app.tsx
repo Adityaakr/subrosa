@@ -293,16 +293,20 @@ const sameFaucet = (f, fid) => {
 function useMidenFi() {
   const a = useMidenFiAdapter();
   const [balance, setBalance] = React.useState(0n);
+  const [assets, setAssets] = React.useState([]); // full OBX holdings (any faucet)
   const [tick, setTick] = React.useState(0);
   const refreshAssets = React.useCallback(async () => {
-    if (!a.connected || !a.requestAssets) { setBalance(0n); return 0n; }
+    if (!a.connected || !a.requestAssets) { setBalance(0n); setAssets([]); return 0n; }
     let fid = null; try { fid = localStorage.getItem(FAUCET_LS); } catch (e) {}
     try {
-      const assets = await a.requestAssets();
-      const list = Array.isArray(assets) ? assets : (assets?.assets || []);
-      console.log("[midenfi] assets:", JSON.stringify(list), "| our faucet:", fid);
+      const got = await a.requestAssets();
+      const list = Array.isArray(got) ? got : (got?.assets || []);
+      setAssets(list);
+      // Show the largest holding as the spendable balance (the wallet may hold
+      // OBX from a faucet that differs from the app's current one).
       const match = (fid && list.find((x) => sameFaucet(x.faucetId ?? x.assetId, fid))) || null;
-      const v = match ? BigInt(match.amount ?? match.balance ?? 0) : 0n;
+      const top = list.reduce((m, x) => { const v = BigInt(x.amount ?? x.balance ?? 0); return v > m ? v : m; }, 0n);
+      const v = match ? BigInt(match.amount ?? match.balance ?? 0) : top;
       setBalance(v);
       return v;
     } catch (e) { return 0n; }
@@ -312,14 +316,25 @@ function useMidenFi() {
   const connect = async () => {
     const w = a.wallets && a.wallets[0];
     if (!w) throw new Error("Miden Wallet extension not detected");
+    // select() must register before connect(), or the adapter throws
+    // WalletNotSelectedError. Select, wait, then connect — retry once if the
+    // selection hasn't propagated yet.
     a.select(w.adapter.name);
-    await new Promise((r) => setTimeout(r, 60));
-    await a.connect(PrivateDataPermission.UponRequest, WalletAdapterNetwork.Testnet);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      await new Promise((r) => setTimeout(r, attempt === 0 ? 120 : 400));
+      try {
+        await a.connect(PrivateDataPermission.UponRequest, WalletAdapterNetwork.Testnet);
+        return;
+      } catch (e) {
+        if (attempt === 1 || !/WalletNotSelected/i.test(String(e?.name || e?.message || e))) throw e;
+        a.select(w.adapter.name);
+      }
+    }
   };
   return {
     available: (a.wallets && a.wallets.length > 0) || false,
     connected: a.connected, connecting: a.connecting,
-    address: a.address, balance, balanceLabel: formatAssetAmount(balance, FUND_DECIMALS),
+    address: a.address, balance, balanceLabel: formatAssetAmount(balance, FUND_DECIMALS), assets,
     connect, disconnect: a.disconnect,
     requestSend: a.requestSend, waitForTransaction: a.waitForTransaction, requestConsumableNotes: a.requestConsumableNotes, requestConsume: a.requestConsume,
     refreshAssets, refresh: () => setTick((t) => t + 1),
@@ -526,8 +541,18 @@ function App() {
       if (mf.connected && mf.address && mf.requestSend) {
         try {
           const marketHex = (order.market && LIVE_MARKETS[order.market.id]) || MARKET_ID_HEX;
-          const faucetHex = (() => { try { return localStorage.getItem(FAUCET_LS); } catch (e) { return null; } })();
-          if (!faucetHex) throw new Error("Fund your Miden Wallet first (no OBX faucet)");
+          // The Miden Wallet may hold OBX from a faucet that differs from the
+          // app's current web faucet (e.g. after a faucet refresh). Stake from a
+          // faucet the wallet ACTUALLY holds enough of, so the send can succeed.
+          const need = Number(parseAssetAmount(String(order.amount), FUND_DECIMALS));
+          const lsFid = (() => { try { return localStorage.getItem(FAUCET_LS); } catch (e) { return null; } })();
+          const held = (mf.assets || []).map((x) => ({ id: x.faucetId ?? x.assetId, amt: Number(x.amount ?? x.balance ?? 0) })).filter((h) => h.id);
+          const faucetHex = (
+            held.find((h) => lsFid && sameFaucet(h.id, lsFid) && h.amt >= need) ||
+            held.filter((h) => h.amt >= need).sort((p, q) => q.amt - p.amt)[0] ||
+            held.sort((p, q) => q.amt - p.amt)[0]
+          )?.id;
+          if (!faucetHex) throw new Error("Your Miden Wallet has no OBX to stake — fund it first.");
           window.txToast?.({ kind: "cosign", title: "Approve in Miden Wallet", desc: "Confirm the transaction in your wallet extension to stake your OBX." });
           // requestSend resolves to a request id (a UUID), NOT the on-chain tx
           // hash. waitForTransaction blocks until the extension proves + submits,
@@ -559,6 +584,7 @@ function App() {
         } catch (e) {
           console.warn("[place:midenfi] failed:", e);
           window.txToast?.({ kind: "error", title: "Miden Wallet place failed", desc: String(e?.message || e).slice(0, 140) });
+          setSeal(null); // don't leave the seal stuck on "sealing…"
         }
         return;
       }
@@ -620,6 +646,7 @@ function App() {
       } catch (e) {
         console.warn("[place] on-chain tx failed:", e);
         window.txToast?.({ kind: "error", title: "Position tx failed", desc: "The on-chain commitment couldn't be submitted. See console for details." });
+        setSeal(null); // don't leave the seal stuck on "sealing…"
       }
     })();
   };
