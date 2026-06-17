@@ -29,3 +29,15 @@ if (!existsSync(src)) {
 mkdirSync(dirname(dest), { recursive: true });
 copyFileSync(src, dest);
 console.log(`[copy-wasm] ${dest} (for the worker's relative WASM fetch)`);
+
+// Safety net for the static landing page. On some platforms (observed on Linux,
+// which is what CI/Railway build on) rollup silently omits the root index.html
+// entry from the multi-page build — leaving `/` 404ing in production. The
+// landing page is fully self-contained (inline CSS/JS, only absolute /fonts and
+// /logo public-asset refs), so a verbatim copy is identical to rollup's output.
+const landingDest = resolve(root, "dist/index.html");
+if (!existsSync(landingDest)) {
+  const landingSrc = resolve(root, "index.html");
+  copyFileSync(landingSrc, landingDest);
+  console.log(`[copy-wasm] ${landingDest} (rollup dropped it — copied source landing page)`);
+}

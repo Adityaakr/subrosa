@@ -14,17 +14,29 @@ const coiHeaders = {
   "Cross-Origin-Embedder-Policy": "credentialless",
 };
 
+// The browser calls Guardian same-origin at `${origin}/guardian`; we proxy that
+// to the self-hosted Guardian's plain HTTP REST (:3000). In prod (Railway) the
+// Guardian runs as a separate service — point GUARDIAN_URL at its internal URL
+// (e.g. http://guardian.railway.internal:3000). Falls back to localhost in dev.
+const guardianTarget = process.env.GUARDIAN_URL || "http://localhost:3000";
+const guardianProxy = {
+  "/guardian": { target: guardianTarget, changeOrigin: true, ws: false, rewrite: (p: string) => p.replace(/^\/guardian/, "") },
+};
+
 export default defineConfig({
   plugins: [react(), midenVitePlugin({ crossOriginIsolation: false })],
   server: {
     headers: coiHeaders,
-    // Proxy the self-hosted Guardian (plain HTTP REST on :3000) so the browser
-    // reaches it same-origin (no CORS). guardianEndpoint = `${origin}/guardian`.
-    proxy: {
-      "/guardian": { target: "http://localhost:3000", changeOrigin: true, ws: false, rewrite: (p) => p.replace(/^\/guardian/, "") },
-    },
+    proxy: guardianProxy,
   },
-  preview: { headers: coiHeaders },
+  // `vite preview` is the production server on Railway: it must send the same
+  // cross-origin-isolation headers AND proxy /guardian, and accept the Railway
+  // public hostname. (Set `host` + `--port $PORT` via the start command.)
+  preview: {
+    headers: coiHeaders,
+    proxy: guardianProxy,
+    allowedHosts: true,
+  },
   resolve: {
     // Dedupe @miden-sdk so the OZ multisig client and the app share ONE SDK
     // instance (top-level 0.14.11) — otherwise the OZ client's nested 0.14.5
