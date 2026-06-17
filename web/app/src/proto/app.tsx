@@ -287,7 +287,7 @@ function useMidenFi() {
     connected: a.connected, connecting: a.connecting,
     address: a.address, balance, balanceLabel: formatAssetAmount(balance, FUND_DECIMALS),
     connect, disconnect: a.disconnect,
-    requestConsumableNotes: a.requestConsumableNotes, requestConsume: a.requestConsume,
+    requestSend: a.requestSend, requestConsumableNotes: a.requestConsumableNotes, requestConsume: a.requestConsume,
     refreshAssets, refresh: () => setTick((t) => t + 1),
   };
 }
@@ -453,6 +453,36 @@ function App() {
         }
       }
       setSeal({ order: { ...order, placeId } });
+
+      // If MidenFi is the active wallet, the bet is SIGNED BY THE EXTENSION and
+      // paid from the MidenFi wallet (pop-up + balance drop): send the stake to
+      // the market account via the adapter. (The built-in path below uses the
+      // private place-note + commitment.)
+      if (mf.connected && mf.address && mf.requestSend) {
+        try {
+          const marketHex = (order.market && LIVE_MARKETS[order.market.id]) || MARKET_ID_HEX;
+          const faucetHex = (() => { try { return localStorage.getItem(FAUCET_LS); } catch (e) { return null; } })();
+          if (!faucetHex) throw new Error("Fund your Miden Wallet first (no OBX faucet)");
+          window.txToast?.({ kind: "cosign", title: "Approve in Miden Wallet", desc: "Confirm the transaction in your wallet extension to stake your OBX." });
+          const sres = await mf.requestSend({
+            senderAddress: mf.address,
+            recipientAddress: marketHex,
+            faucetId: faucetHex,
+            noteType: "private",
+            amount: Number(parseAssetAmount(String(order.amount), FUND_DECIMALS)),
+          });
+          const tx = sres?.transactionId ?? sres?.txId ?? (typeof sres === "string" ? sres : null);
+          setRealTx({ tx, account: mf.address, marketHex, noteId: null, coSignMultisig, viaMidenFi: true });
+          setPositions((ps) => ps.map((p) => (p.id === placeId ? { ...p, tx, account: mf.address, marketAccount: marketHex, coSignMultisig, commitment: tx ? shortHex(tx) : p.commitment } : p)));
+          setTimeout(() => { try { mf.refreshAssets?.(); } catch (e) {} }, 3000);
+          window.txToast?.({ kind: "tx", title: `${order.side} position placed · ${order.amount} OBX (Miden Wallet)`, desc: "Signed by your Miden Wallet and staked to the market — balance debited from your external wallet.", tx, account: mf.address });
+        } catch (e) {
+          console.warn("[place:midenfi] failed:", e);
+          window.txToast?.({ kind: "error", title: "Miden Wallet place failed", desc: String(e?.message || e).slice(0, 140) });
+        }
+        return;
+      }
+
       try {
         const acct = await builtin.connect();
         const signerRef = acct.id();
