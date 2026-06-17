@@ -32,7 +32,9 @@ const SLOT_RES = "miden_market::market::resolution";
 const LIVE_MARKETS = {
   "miden-mainnet": MARKET_ID_HEX,
   "eth-4k": "0x612f7f710da01a10116a1ca76afac5", // seeded 63% YES
-  "fed-sep": "0x60de1a3b8cf5cb10384598e50506cf", // seeded 45% YES
+  // Fresh unresolved market, seeded 45% YES (5500/4500). The previous account
+  // (0x60de1a…) had been resolved YES on-chain — wrong for a Sep-dated question.
+  "fed-sep": "0x7003429f9cdb431056970e854e5ed6", // seeded 45% YES, LIVE
 };
 
 const wordToBig = (w) => { try { return w ? w.toU64s()[0] : 0n; } catch (e) { return 0n; } };
