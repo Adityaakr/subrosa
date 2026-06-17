@@ -343,13 +343,16 @@ function useMidenFi() {
 
 /* Reads every registered live market's on-chain state on an interval (serially,
    to respect the single WASM client) → { [marketId]: {yesPct, volume, ...} }. */
-function useLiveMarkets(client, isReady) {
+function useLiveMarkets(client, isReady, pausedRef) {
   const [live, setLive] = React.useState({});
   React.useEffect(() => {
     if (!isReady || !client) return;
     let alive = true, inflight = false;
     const tick = async () => {
-      if (inflight) return; inflight = true;
+      // Skip while a Guardian co-sign is running — it drives its own Miden
+      // client + a long STARK proof on the shared WASM, and a concurrent read
+      // here aborts the in-flight proof ("BodyStreamBuffer was aborted").
+      if (inflight || (pausedRef && pausedRef.current)) return; inflight = true;
       try {
         const out = {};
         for (const [mid, acctHex] of Object.entries(LIVE_MARKETS)) {
@@ -389,7 +392,11 @@ function App() {
   React.useEffect(() => {
     if (isReady && client) window.__subrosaReadMarket = (hex) => readMarketState(client, hex || MARKET_ID_HEX);
   }, [isReady, client]);
-  const live = useLiveMarkets(client, isReady);
+  // Pause background WASM reads while a co-sign proof is in flight (ref so the
+  // poller sees the latest value without restarting its interval).
+  const coSignActiveRef = React.useRef(false);
+  coSignActiveRef.current = !!coSignStep;
+  const live = useLiveMarkets(client, isReady, coSignActiveRef);
   React.useEffect(() => { window.__subrosaLive = live; }, [live]);
   const [mfFunding, setMfFunding] = React.useState(false);
   const [mfFundMsg, setMfFundMsg] = React.useState(null);
