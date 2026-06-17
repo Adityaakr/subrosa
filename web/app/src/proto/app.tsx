@@ -170,9 +170,9 @@ function useWallet() {
   // Reuse the persisted test faucet if it's still in the store, else create one.
   // maxSupply is in BASE units and must exceed everything we ever mint:
   // 1000 OBX * 10^8 = 1e11 per fund, so give it ample headroom (1e16).
-  const ensureFaucet = async () => {
-    if (faucetId && list.find((a) => sameId(a, faucetId))) return faucetId;
-    setFundMsg("Creating test faucet…");
+  const ensureFaucet = async (force = false) => {
+    if (!force && faucetId && list.find((a) => sameId(a, faucetId))) return faucetId;
+    setFundMsg(force ? "Refreshing test faucet…" : "Creating test faucet…");
     const f = await wasmRetry(() => createFaucet({ tokenSymbol: "OBX", decimals: FUND_DECIMALS, maxSupply: 10_000_000_000_000_000n, storageMode: "public" }));
     const fid = idOf(f);
     try { localStorage.setItem(FAUCET_LS, fid); } catch (e) {}
@@ -180,6 +180,12 @@ function useWallet() {
     try { await wasmRetry(() => sync()); } catch (e) {}
     return fid;
   };
+
+  // A faucet created under an older toolchain fails to mint with a "procedure …
+  // could not be found" / kernel error once the SDK moves on. Treat those as a
+  // signal to rebuild the faucet with the current SDK rather than a hard fail.
+  const isStaleCodeError = (e) =>
+    /could not be found|procedure with root|MASM|kernel|deserializ|incompatible/i.test(String(e?.message || e));
 
   // Self-contained funding: mint test OBX from our own web-SDK faucet to the
   // wallet, then consume the note. Same toolchain end-to-end → the consume's
@@ -189,9 +195,20 @@ function useWallet() {
     if (!id || funding) return;
     setFunding(true); setError(null);
     try {
-      const fid = await ensureFaucet();
+      let fid = await ensureFaucet();
       setFundMsg("Minting 1,000 OBX…");
-      await wasmRetry(() => mint({ targetAccountId: id, faucetId: fid, amount: parseAssetAmount("1000", FUND_DECIMALS), noteType: "private" }));
+      const doMint = (f) => wasmRetry(() => mint({ targetAccountId: id, faucetId: f, amount: parseAssetAmount("1000", FUND_DECIMALS), noteType: "private" }));
+      try {
+        await doMint(fid);
+      } catch (e) {
+        // The persisted faucet went stale (couldn't mint) — rebuild a fresh one
+        // with the current SDK and mint from that. This is what unblocks "can't
+        // fund more"; the new faucet becomes the wallet's OBX going forward.
+        if (!isStaleCodeError(e)) throw e;
+        console.warn("[fund] faucet unusable, recreating:", String(e?.message || e).split("\n")[0]);
+        fid = await ensureFaucet(true);
+        await doMint(fid);
+      }
       setFundMsg("Claiming…");
       // Only consume notes carrying OUR faucet's asset. A wallet may hold stale
       // notes from earlier attempts (e.g. a CLI-minted note) that the web client
@@ -206,12 +223,19 @@ function useWallet() {
         try { await wasmRetry(() => sync()); } catch (e) {}
         try { await notes.refetch?.(); } catch (e) {}
         const ids = (notesRef.current || []).filter(isOurs).map((s) => s.id).filter(Boolean);
-        if (ids.length) {
-          const cres = await wasmRetry(() => consume({ accountId: id, notes: ids }));
-          claimTx = cres?.transactionId ?? null;
-          claimed = true;
-          break;
+        if (!ids.length) continue;
+        // Consume per-note so one stale/incompatible note can't fail the whole
+        // claim — keep the ones that work, skip the ones that don't.
+        for (const nid of ids) {
+          try {
+            const cres = await wasmRetry(() => consume({ accountId: id, notes: [nid] }));
+            claimTx = cres?.transactionId ?? claimTx;
+            claimed = true;
+          } catch (e) {
+            console.warn("[fund] skipped a note that wouldn't consume:", String(e?.message || e).split("\n")[0]);
+          }
         }
+        if (claimed) break;
       }
       try { await q.refetch?.(); } catch (e) {}
       setFundMsg(claimed ? "Funded ✓" : "Minted — balance updates shortly");
@@ -237,8 +261,16 @@ function useWallet() {
   // the external MidenFi wallet, which then consumes via its own extension).
   // Returns the faucet id so the caller can match the resulting note/asset.
   const mintTo = async (targetAddress) => {
-    const fid = await ensureFaucet();
-    await wasmRetry(() => mint({ targetAccountId: targetAddress, faucetId: fid, amount: parseAssetAmount("1000", FUND_DECIMALS), noteType: "public" }));
+    let fid = await ensureFaucet();
+    const doMint = (f) => wasmRetry(() => mint({ targetAccountId: targetAddress, faucetId: f, amount: parseAssetAmount("1000", FUND_DECIMALS), noteType: "public" }));
+    try {
+      await doMint(fid);
+    } catch (e) {
+      if (!isStaleCodeError(e)) throw e;
+      console.warn("[mintTo] faucet unusable, recreating:", String(e?.message || e).split("\n")[0]);
+      fid = await ensureFaucet(true);
+      await doMint(fid);
+    }
     return fid;
   };
 
