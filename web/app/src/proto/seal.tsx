@@ -34,20 +34,20 @@ function Scramble({ target, active, dur = 900 }) {
 function HashRow({ label, value, href, priv, pub, hint, pending }) {
   const short = value ? (String(value).length > 18 ? `${String(value).slice(0, 10)}…${String(value).slice(-6)}` : String(value)) : null;
   return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-      <span className="tag" style={{ color: "var(--faint)", whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 5 }}>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, minWidth: 0 }}>
+      <span className="tag" style={{ color: "var(--faint)", whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 5, minWidth: 0, flexShrink: 1, overflow: "hidden", textOverflow: "ellipsis" }}>
         <window.Icon name={priv ? "eye-off" : "shield-check"} size={11} color="var(--faint)" /> {label}
       </span>
       {short ? (
         href ? (
-          <a href={href} target="_blank" rel="noreferrer" className="mono" style={{ fontSize: 12, color: "var(--accent)", fontWeight: 500, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4, background: "var(--accent-dim)", border: "1px solid rgba(255,85,0,0.22)", borderRadius: 999, padding: "3px 9px" }}>
+          <a href={href} target="_blank" rel="noreferrer" className="mono" style={{ fontSize: 12, color: "var(--accent)", fontWeight: 500, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4, background: "var(--accent-dim)", border: "1px solid rgba(255,85,0,0.22)", borderRadius: 999, padding: "3px 9px", whiteSpace: "nowrap", flexShrink: 0, maxWidth: "100%" }}>
             {short} <window.Icon name="chevron-right" size={11} color="var(--accent)" /> explorer
           </a>
         ) : (
-          <span className="mono" title={hint} style={{ fontSize: 12, color: "var(--text)", fontWeight: 500, background: "var(--surface-2)", borderRadius: 999, padding: "3px 9px" }}>{short}</span>
+          <span className="mono" title={hint} style={{ fontSize: 12, color: "var(--text)", fontWeight: 500, background: "var(--surface-2)", borderRadius: 999, padding: "3px 9px", whiteSpace: "nowrap", flexShrink: 0, maxWidth: "100%" }}>{short}</span>
         )
       ) : (
-        <span className="mono" style={{ fontSize: 12, color: "var(--accent)" }}>{pending || "…"}</span>
+        <span className="mono" style={{ fontSize: 12, color: "var(--accent)", whiteSpace: "nowrap", flexShrink: 0 }}>{pending || "…"}</span>
       )}
     </div>
   );
