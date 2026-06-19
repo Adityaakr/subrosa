@@ -330,7 +330,7 @@ function ToastHost() {
 /* ---------- Guardian co-sign progress (the ~1–2 min flow) ---------- */
 const COSIGN_STEPS = [
   { label: "Connecting to Guardian", desc: "Reaching your self-hosted Guardian server.", m: /connect/i },
-  { label: "Creating the 2-of-N multisig", desc: "A fresh multisig account — agent + you, Guardian-verified.", m: /creat|multisig/i },
+  { label: "Preparing your 2-of-N multisig", desc: "Your durable Guardian multisig — agent + you, reused each time.", m: /creat|load|multisig/i },
   { label: "Collecting signatures", desc: "Agent signs, then your signature (2-of-N).", m: /collect|signatur/i },
   { label: "Executing on-chain", desc: "Proving + submitting the co-signed transaction to Miden.", m: /execut|on-chain/i },
 ];
@@ -360,7 +360,7 @@ function CoSignModal({ step }) {
           </span>
           <span className="mono" style={{ fontSize: 13, color: "var(--accent)", fontWeight: 500 }}><Elapsed since={startRef.current} /></span>
         </div>
-        <p style={{ margin: "0 0 16px", fontSize: 12.5, lineHeight: 1.5, color: "var(--muted)" }}>A real 2-of-N multisig is being created and co-signed on Miden — this is genuine on-chain work, so it takes about <b style={{ color: "var(--text)" }}>1–2 minutes</b>.</p>
+        <p style={{ margin: "0 0 16px", fontSize: 12.5, lineHeight: 1.5, color: "var(--muted)" }}>Your 2-of-N multisig is being co-signed on Miden — this is genuine on-chain work, so it takes about <b style={{ color: "var(--text)" }}>1–2 minutes</b>.</p>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {COSIGN_STEPS.map((s, i) => {
             const done = i < active, now = i === active;
