@@ -14,6 +14,9 @@ const MARKET_ID_HEX = "0x5ff0303f0b795d1039ca5b51d8480b";
 const OBX_FAUCET_HEX = "0x1201d9f8819d5220778535e4e2f08a";
 const REDEEM_ENDPOINT = import.meta.env.VITE_REDEEM_ENDPOINT ?? "http://localhost:8788/redeem";
 const WALLET_LS = "subrosa.wallet.id";
+// Positions are stored per wallet: `subrosa.pos.<walletId>`. Each wallet (user)
+// only ever sees its own — nothing is shared across browsers/accounts.
+const POS_LS_PREFIX = "subrosa.pos.";
 // per-browser test-OBX faucet (web SDK). Versioned: bumping abandons faucets
 // created with old params (e.g. the pre-fix 1e9 maxSupply) so a correct one is
 // made automatically — no manual storage clearing needed.
@@ -423,13 +426,15 @@ function useLiveMarkets(client, isReady, pausedRef) {
 function App() {
   const [route, setRoute] = React.useState("markets");
   const [market, setMarket] = React.useState(null);
-  const [positions, setPositions] = React.useState(() => window.OBS.positions.map((p) => ({ ...p })));
+  // Positions are loaded PER WALLET from localStorage (see the effect below) —
+  // never shared across users. Starts empty; the connected wallet's set is
+  // hydrated once we know which wallet it is.
+  const [positions, setPositions] = React.useState([]);
   const [agents, setAgents] = React.useState(() => window.OBS.agents.map((a) => ({ ...a })));
   const [approvals, setApprovals] = React.useState([]); // {id, agentId, agentName, marketName, side, requested, cap, status, step, multisig}
   const [coSignStep, setCoSignStep] = React.useState(null); // live Guardian co-sign progress (null = idle)
   const [seal, setSeal] = React.useState(null); // {order}
   const [realTx, setRealTx] = React.useState(null); // {tx, account}
-  const committed = React.useRef(false);
   const builtin = useWallet();
   const mf = useMidenFi();
   const { execute } = useTransaction();
@@ -517,6 +522,39 @@ function App() {
   // Real spendable balance (OBX) from the connected wallet — drives the bet panel.
   const liveBalance = Number(String(wallet.balanceLabel || "0").replace(/[, ]/g, "")) || 0;
 
+  // ── Per-wallet positions (isolated + persisted) ───────────────────────────
+  // Each wallet gets its own localStorage bucket. Load its set when the wallet
+  // changes; save on every change. The skip-guard stops the freshly-loaded set
+  // from being written back to the wrong key during the wallet-switch render.
+  const walletKey = wallet.connected && wallet.walletId ? POS_LS_PREFIX + wallet.walletId : null;
+  const skipPosSaveRef = React.useRef(false);
+  React.useEffect(() => {
+    skipPosSaveRef.current = true;
+    if (!walletKey) { setPositions([]); return; }
+    let stored = [];
+    try { stored = JSON.parse(localStorage.getItem(walletKey) || "[]"); } catch (e) { stored = []; }
+    // Only confirmed positions persist across sessions — a bet that never
+    // landed (page closed mid-proof) is dropped rather than shown as real.
+    setPositions(Array.isArray(stored) ? stored.filter((p) => p && p.confirmed) : []);
+  }, [walletKey]);
+  React.useEffect(() => {
+    if (skipPosSaveRef.current) { skipPosSaveRef.current = false; return; }
+    if (walletKey) { try { localStorage.setItem(walletKey, JSON.stringify(positions)); } catch (e) {} }
+  }, [positions, walletKey]);
+
+  // A position is created ONLY on a successful place (below). buildPosition
+  // assembles the record; upsertPosition adds-or-patches by id (idempotent if
+  // the same place is recorded twice).
+  const buildPosition = (o, rt, confirmed) => ({
+    id: o.placeId || ("p-" + Math.random().toString(36).slice(2, 7)),
+    marketId: o.market.id, marketAccount: rt?.marketHex, side: o.side, size: o.amount,
+    avg: Math.round(o.price), shares: o.shares, pnl: 0, value: o.amount,
+    commitment: rt?.noteId ? shortHex(rt.noteId) : (rt?.tx ? shortHex(rt.tx) : "(private)"),
+    tx: rt?.tx, noteId: rt?.noteId, account: rt?.account, coSignMultisig: rt?.coSignMultisig,
+    viaMidenFi: !!rt?.viaMidenFi, revealed: false, confirmed: !!confirmed,
+  });
+  const upsertPosition = (pos) => setPositions((ps) => ps.some((p) => p.id === pos.id) ? ps.map((p) => p.id === pos.id ? { ...p, ...pos } : p) : [pos, ...ps]);
+
   const go = (r) => { if (r !== "detail") setMarket(null); setRoute(r); };
   const openMarket = (m) => { setMarket(m); setRoute("detail"); };
 
@@ -574,7 +612,6 @@ function App() {
   };
 
   const place = (order) => {
-    committed.current = false;
     setRealTx(null);
     const placeId = "p-" + Math.random().toString(36).slice(2, 7); // stable id to patch later
     // Positions are placed from the built-in PRIVATE account (the chain sees
@@ -642,8 +679,10 @@ function App() {
           } catch (e) {
             console.warn("[place:midenfi] waitForTransaction:", e?.message || e);
           }
-          setRealTx({ tx, account: mf.address, marketHex, noteId, coSignMultisig, viaMidenFi: true });
-          setPositions((ps) => ps.map((p) => (p.id === placeId ? { ...p, tx, account: mf.address, marketAccount: marketHex, coSignMultisig, commitment: noteId ? shortHex(noteId) : (tx ? shortHex(tx) : p.commitment) } : p)));
+          const rt = { tx, account: mf.address, marketHex, noteId, coSignMultisig, viaMidenFi: true };
+          setRealTx(rt);
+          // Record the position ONLY now that the send went through.
+          upsertPosition(buildPosition({ ...order, placeId }, rt, true));
           setTimeout(() => { try { mf.refreshAssets?.(); } catch (e) {} }, 3000);
           window.txToast?.({ kind: "tx", title: `${order.side} position placed · ${order.amount} OBX (Miden Wallet)`, desc: "Signed by your Miden Wallet and staked to the market — balance debited from your external wallet.", tx, account: mf.address });
         } catch (e) {
@@ -694,12 +733,10 @@ function App() {
             await new Promise((r) => setTimeout(r, 2000 * attempt));
           }
         }
-        setRealTx({ tx: res.transactionId, account: signerRef.toString(), marketHex, noteId, coSignMultisig });
-        // If finalize() already created the position (user clicked View before
-        // the tx landed), patch it with the real tx + commitment.
-        setPositions((ps) => ps.map((p) => (p.id === placeId
-          ? { ...p, tx: res.transactionId, noteId, account: signerRef.toString(), marketAccount: marketHex, coSignMultisig, commitment: shortHex(noteId || res.transactionId) }
-          : p)));
+        const rt = { tx: res.transactionId, account: signerRef.toString(), marketHex, noteId, coSignMultisig };
+        setRealTx(rt);
+        // Record the position ONLY now that the on-chain tx succeeded.
+        upsertPosition(buildPosition({ ...order, placeId }, rt, true));
         setTimeout(() => { try { builtin.refetch?.(); } catch (e) {} }, 2500); // reflect the lower balance
         window.txToast?.({
           kind: coSignMultisig ? "cosign" : "tx",
@@ -716,20 +753,10 @@ function App() {
     })();
   };
 
+  // The seal modal is purely visual now — the position is written by place()
+  // only on a successful tx, so dismissing/viewing the seal never creates a
+  // position for a bet that failed. Just close and (optionally) navigate.
   const finalize = (navigate) => {
-    if (!committed.current) {
-      committed.current = true;
-      const o = seal.order;
-      const pos = {
-        id: o.placeId || ("p-" + Math.random().toString(36).slice(2, 7)),
-        marketId: o.market.id, marketAccount: realTx?.marketHex, side: o.side, size: o.amount,
-        avg: Math.round(o.price), shares: o.shares, pnl: 0, value: o.amount,
-        commitment: realTx?.noteId ? shortHex(realTx.noteId) : (realTx ? shortHex(realTx.tx) : "(submitting…)"),
-        tx: realTx?.tx, noteId: realTx?.noteId, account: realTx?.account, coSignMultisig: realTx?.coSignMultisig, revealed: false,
-      };
-      // de-dupe in case the place() patch already inserted/updated this id
-      setPositions((ps) => ps.some((p) => p.id === pos.id) ? ps.map((p) => p.id === pos.id ? { ...p, ...pos } : p) : [pos, ...ps]);
-    }
     setSeal(null);
     if (navigate) go("positions");
   };
