@@ -130,13 +130,16 @@ function Cat({ name }) {
 /* ---------- sidebar ---------- */
 function NavBtn({ it, on, onClick }) {
   const [h, setH] = useState(false);
+  const soon = !!it.soon;
   return (
-    <button onClick={onClick} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
-      style={{ display: "flex", alignItems: "center", gap: 11, padding: "9px 11px", borderRadius: "var(--r-md)", border: "none", cursor: "pointer", background: on ? "var(--accent-dim)" : h ? "var(--surface-2)" : "transparent", color: on ? "var(--text)" : "var(--muted)", fontSize: 14, fontWeight: on ? 600 : 500, transition: "background 140ms ease, color 140ms ease", textAlign: "left", position: "relative" }}>
+    <button onClick={soon ? undefined : onClick} disabled={soon} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
+      title={soon ? "Coming soon" : undefined}
+      style={{ display: "flex", alignItems: "center", gap: 11, padding: "9px 11px", borderRadius: "var(--r-md)", border: "none", cursor: soon ? "default" : "pointer", background: on ? "var(--accent-dim)" : (h && !soon) ? "var(--surface-2)" : "transparent", color: on ? "var(--text)" : "var(--muted)", fontSize: 14, fontWeight: on ? 600 : 500, transition: "background 140ms ease, color 140ms ease", textAlign: "left", position: "relative", opacity: soon ? 0.5 : 1 }}>
       {on ? <span style={{ position: "absolute", left: -16, top: 10, bottom: 10, width: 3, borderRadius: 3, background: "var(--accent)" }} /> : null}
       <window.Icon name={it.icon} size={17} color={on ? "var(--accent)" : "var(--faint)"} />
       {it.label}
-      {it.badge ? <span className="mono" style={{ marginLeft: "auto", fontSize: 11, color: "var(--faint)", background: "var(--surface-2)", borderRadius: 6, padding: "1px 6px" }}>{it.badge}</span> : null}
+      {soon ? <span className="tag" style={{ marginLeft: "auto", fontSize: 9.5, letterSpacing: "0.04em", color: "var(--faint)", background: "var(--surface-2)", borderRadius: 6, padding: "2px 6px" }}>SOON</span>
+        : it.badge ? <span className="mono" style={{ marginLeft: "auto", fontSize: 11, color: "var(--faint)", background: "var(--surface-2)", borderRadius: 6, padding: "1px 6px" }}>{it.badge}</span> : null}
     </button>
   );
 }
@@ -145,8 +148,8 @@ function Sidebar({ route, go, positionsCount, approvalsCount }) {
   const items = [
     { k: "markets", label: "Markets", icon: "layers" },
     { k: "positions", label: "Positions", icon: "wallet", badge: positionsCount },
-    { k: "agents", label: "Agents", icon: "bot" },
-    { k: "approvals", label: "Approvals", icon: "shield-check", badge: approvalsCount },
+    { k: "agents", label: "Agents", icon: "bot", soon: true },
+    { k: "approvals", label: "Approvals", icon: "shield-check", badge: approvalsCount, soon: true },
   ];
   const active = (k) => route === k || (k === "markets" && route === "detail");
   return (
