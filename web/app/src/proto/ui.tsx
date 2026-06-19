@@ -224,7 +224,7 @@ function WalletMenu({ w }) {
         <>
           <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
           <div style={{ position: "absolute", top: 44, right: 0, width: 312, zIndex: 41, background: "var(--surface)", border: "1px solid var(--hair-2)", borderRadius: "var(--r-md)", boxShadow: "0 20px 50px rgba(12,12,14,0.22)", padding: 8, animation: "fadeUp 0.18s ease both" }}>
-            <div className="tag" style={{ color: "var(--faint)", padding: "8px 10px 6px" }}>{isMf ? "MIDEN WALLET" : "SUBROSA WALLET"}</div>
+            <div className="tag" style={{ color: "var(--faint)", padding: "8px 10px 6px" }}>{isMf ? "MIDEN WALLET" : "SUBROSA WALLET"} · PRIVATE</div>
             <div className="mono" style={{ fontSize: 11.5, color: "var(--text)", padding: "0 10px 10px", wordBreak: "break-all", lineHeight: 1.5 }}>{addr}</div>
             <button onClick={copy} style={item} onMouseEnter={(e) => hov(e, true)} onMouseLeave={(e) => hov(e, false)}>
               <window.Icon name={copied ? "check" : "copy"} size={15} color={copied ? "var(--yes)" : "var(--faint)"} />
@@ -232,8 +232,11 @@ function WalletMenu({ w }) {
             </button>
             <a href={explorer} target="_blank" rel="noreferrer" onClick={() => setOpen(false)} style={item} onMouseEnter={(e) => hov(e, true)} onMouseLeave={(e) => hov(e, false)}>
               <window.Icon name="external-link" size={15} color="var(--faint)" />
-              View on Midenscan
+              Look up on Midenscan
             </a>
+            <p style={{ margin: "4px 10px 6px", fontSize: 10.5, lineHeight: 1.45, color: "var(--faint)" }}>
+              This is a <b style={{ color: "var(--muted)" }}>private</b> account — the chain stores only a commitment, so Midenscan won't show its balance. It appears there only after it makes a transaction, and then only its tx hashes are visible. That privacy is the point.
+            </p>
             <div style={{ height: 1, background: "var(--hair)", margin: "6px 4px" }} />
             <button onClick={() => { setOpen(false); w.disconnect && w.disconnect(); }} style={{ ...item, color: "var(--no)" }} onMouseEnter={(e) => hov(e, true)} onMouseLeave={(e) => hov(e, false)}>
               <window.Icon name="x" size={15} color="var(--no)" />
