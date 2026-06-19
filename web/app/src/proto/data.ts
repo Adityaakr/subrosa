@@ -29,31 +29,6 @@
       yes: 45, volume: "$908k", liquidity: "$240k", closes: "Sep 17, 2026", closesIn: "93d",
       oracle: "Pragma", traders: 4210, change: -1.8, noFavored: true,
     },
-    {
-      id: "wc-final", category: "Sports", question: "Will the home side win Saturday's fixture?",
-      yes: 52, volume: "$74k", liquidity: "$38k", closes: "Jun 20, 2026", closesIn: "4d",
-      oracle: "Pragma", traders: 980, change: +0.6,
-    },
-    {
-      id: "gpt5", category: "Tech", question: "Will a frontier lab ship a new flagship model by Q3?",
-      yes: 68, volume: "$203k", liquidity: "$92k", closes: "Sep 30, 2026", closesIn: "106d",
-      oracle: "Optimistic", traders: 2350, change: +3.2,
-    },
-    {
-      id: "btc-ath", category: "Crypto", question: "New BTC all-time high before October?",
-      yes: 41, volume: "$1.2M", liquidity: "$420k", closes: "Sep 30, 2026", closesIn: "106d",
-      oracle: "Pragma", traders: 7120, change: -2.1, noFavored: true,
-    },
-    {
-      id: "agent-tvl", category: "DeFi", question: "Confidential-agent TVL tops $10M by year-end?",
-      yes: 56, volume: "$58k", liquidity: "$30k", closes: "Dec 31, 2026", closesIn: "198d",
-      oracle: "Optimistic", traders: 430, change: +1.1,
-    },
-    {
-      id: "sol-flip", category: "Crypto", question: "Will SOL outperform ETH this quarter?",
-      yes: 38, volume: "$167k", liquidity: "$71k", closes: "Sep 30, 2026", closesIn: "106d",
-      oracle: "Pragma", traders: 1520, change: -0.9, noFavored: true,
-    },
   ];
   markets.forEach((m) => { m.history = series(m.yes, 40, 3.2); });
 
