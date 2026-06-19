@@ -113,6 +113,15 @@ function useWallet() {
 
   // every wallet this client has in its local store
   const list = React.useMemo(() => [...(wallets || []), ...(accounts || [])].filter(Boolean), [wallets, accounts]);
+  // Mirror the store list + loading flag into refs so connect() can read the
+  // FRESH value across awaits (the closured `list`/`listLoading` are stale once
+  // the async fn is running). This is what prevents the "wallet reset" race —
+  // connect() must not create a second wallet just because the store hadn't
+  // hydrated yet at the moment the closure was captured.
+  const listRef = React.useRef(list);
+  const loadingRef = React.useRef(listLoading);
+  React.useEffect(() => { listRef.current = list; }, [list]);
+  React.useEffect(() => { loadingRef.current = listLoading; }, [listLoading]);
 
   const { createFaucet } = useCreateFaucet();
   const { mint } = useMint();
@@ -144,15 +153,19 @@ function useWallet() {
   let balance = 0n;
   try { if (q.getBalance && faucetId) balance = q.getBalance(faucetId) ?? 0n; } catch (e) {}
 
-  // Once the store list has loaded, drop a persisted id that no longer exists
-  // (e.g. the IndexedDB was reset) — but never wipe a freshly created wallet.
+  // Drop a persisted id only when it's truly invalid: a co-sign multisig (never
+  // "your wallet"), OR an id that's absent from a store that has HYDRATED WITH
+  // ACCOUNTS. Requiring list.length > 0 is the fix for the spurious reset — an
+  // empty list during initial load no longer looks like "your wallet is gone".
   React.useEffect(() => {
-    if (walletId && (isCoSignId(walletId) || (!listLoading && !stored && !acctRef.current))) {
+    if (!walletId) return;
+    const gone = !listLoading && list.length > 0 && !stored && !acctRef.current;
+    if (isCoSignId(walletId) || gone) {
       try { localStorage.removeItem(WALLET_LS); } catch (e) {}
       acctRef.current = null;
       setWalletId(null);
     }
-  }, [walletId, listLoading, stored]);
+  }, [walletId, listLoading, stored, list.length]);
 
   const address = account ? idOf(account) : walletId;
 
@@ -161,10 +174,16 @@ function useWallet() {
     if (account) return account;
     setConnecting(true);
     try {
-      // Reuse the persisted wallet if it's still in the store; otherwise create
-      // a FRESH basic wallet. Never adopt arbitrary store accounts — co-sign
-      // multisigs live in the same IndexedDB and must not become "your wallet".
-      let w = (walletId && !isCoSignId(walletId) && list.find((a) => sameId(a, walletId))) || null;
+      // Recover the PERSISTED wallet first. The store hydrates asynchronously,
+      // so wait for it before concluding the wallet is gone — creating a fresh
+      // wallet here just because the list hadn't loaded was the "my wallet keeps
+      // changing" bug. Only mint a new wallet when there's genuinely no persisted
+      // id, or the id is truly absent from a fully-loaded store.
+      let w = null;
+      if (walletId && !isCoSignId(walletId)) {
+        for (let i = 0; i < 30 && loadingRef.current; i++) await new Promise((r) => setTimeout(r, 150));
+        w = listRef.current.find((a) => sameId(a, walletId)) || null;
+      }
       if (!w) w = await createWallet({ storageMode: "private" });
       acctRef.current = w;
       try { localStorage.setItem(WALLET_LS, idOf(w)); } catch (e) {}
@@ -507,7 +526,7 @@ function App() {
       setCoSignStep(null);
       setApprovals((xs) => xs.map((x) => (x.id === ap.id ? { ...x, status: "approved", step: null, multisig: r.multisig } : x)));
       setAgents((as) => as.map((a) => (a.id === ap.agentId ? { ...a, deployed: a.deployed + ap.requested } : a)));
-      window.txToast?.({ kind: "tx", title: "Guardian co-signed ✓", desc: `2-of-N approved — ${ap.agentName} authorized for ${ap.requested} OBX (multisig ${shortHex(r.multisig)}).`, account: r.multisig });
+      window.txToast?.({ kind: "tx", title: "Guardian co-signed ✓", desc: `2-of-N approved — ${ap.agentName} authorized for ${ap.requested} OBX via your ${r.reused ? "" : "new "}Guardian multisig ${shortHex(r.multisig)}.`, account: r.multisig });
     } catch (e) {
       console.warn("[approval] co-sign failed:", e);
       setCoSignStep(null);
@@ -554,7 +573,7 @@ function App() {
           coSignMultisig = r.multisig;
           addCoSignId(r.multisig); // never let the wallet adopt this multisig
           setCoSignStep(null);
-          window.txToast?.({ kind: "cosign", title: "Guardian co-signed ✓", desc: `2-of-N approved (multisig ${shortHex(coSignMultisig)}). Sealing your position…`, account: coSignMultisig });
+          window.txToast?.({ kind: "cosign", title: "Guardian co-signed ✓", desc: `2-of-N approved via your ${r.reused ? "" : "new "}Guardian multisig ${shortHex(coSignMultisig)}. Sealing your position…`, account: coSignMultisig });
         } catch (e) {
           console.warn("[cosign] failed:", e);
           setCoSignStep(null);

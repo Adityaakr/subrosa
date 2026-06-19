@@ -1,7 +1,69 @@
 // @ts-nocheck
 import React from "react";
+import { hasGuardianIdentity, getGuardianMultisigId, exportGuardianIdentity, importGuardianIdentity, resetGuardianIdentity } from "../cosign";
 /* Subrosa prototype — Your positions + Agents */
 const { useState: pS } = React;
+
+// Persistent Guardian identity: the SAME 2-of-N multisig is reused for every
+// co-sign (its keys live in localStorage). This card surfaces that address and
+// lets the user back up / restore the cosigner keys — the recovery model
+// Guardian uses (your keys authorize the account; the operator only co-signs).
+function GuardianIdentityCard() {
+  const [tick, setTick] = pS(0);
+  const [msg, setMsg] = pS(null);
+  const fileRef = React.useRef(null);
+  const has = hasGuardianIdentity();
+  const id = getGuardianMultisigId();
+  const flash = (m) => { setMsg(m); setTimeout(() => setMsg(null), 3500); };
+
+  const backup = () => {
+    try {
+      const data = exportGuardianIdentity();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = `subrosa-guardian-${String(id || "keys").slice(0, 10)}.json`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      flash("Backup downloaded — keep it safe.");
+    } catch (e) { flash(String(e?.message || e)); }
+  };
+  const restore = async (file) => {
+    try {
+      const txt = await file.text();
+      const acct = importGuardianIdentity(txt);
+      setTick((t) => t + 1);
+      flash(`Restored — multisig ${String(acct).slice(0, 10)}…`);
+    } catch (e) { flash(String(e?.message || e)); }
+  };
+  const forget = () => {
+    if (!window.confirm("Forget this Guardian multisig? Without a backup you can't recover it — the next co-sign creates a new one.")) return;
+    resetGuardianIdentity(); setTick((t) => t + 1); flash("Identity cleared.");
+  };
+
+  return (
+    <div style={{ border: "1px solid var(--hair-2)", borderRadius: "var(--r)", padding: "16px 18px", marginBottom: 24, background: "var(--surface)" }}>
+      <div className="grid-2" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, flexWrap: "wrap" }}>
+        <div style={{ minWidth: 0 }}>
+          <div className="tag" style={{ color: "var(--faint)", marginBottom: 4 }}>YOUR GUARDIAN MULTISIG</div>
+          {has ? (
+            <span className="mono" title={id} style={{ fontSize: 13, color: "var(--text)" }}>{id && id.length > 18 ? `${id.slice(0, 12)}…${id.slice(-6)}` : id}</span>
+          ) : (
+            <span style={{ fontSize: 13, color: "var(--muted)" }}>Created on your first co-sign, then reused every time.</span>
+          )}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          <input ref={fileRef} type="file" accept="application/json,.json" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; if (f) restore(f); e.target.value = ""; }} />
+          <button onClick={() => fileRef.current?.click()} style={ghostBtn}>Restore…</button>
+          {has ? <button onClick={backup} style={ghostBtn}>Back up keys</button> : null}
+          {has ? <button onClick={forget} title="Forget this multisig" style={{ ...ghostBtn, color: "var(--no)" }}>Forget</button> : null}
+        </div>
+      </div>
+      {msg ? <div className="mono" style={{ fontSize: 11.5, color: "var(--faint)", marginTop: 10 }}>{msg}</div> : null}
+    </div>
+  );
+}
+const ghostBtn = { height: 32, padding: "0 12px", borderRadius: "var(--r-md)", border: "1px solid var(--hair-2)", background: "var(--surface-2)", color: "var(--text)", fontSize: 12.5, fontWeight: 500, cursor: "pointer" };
 
 function Toggle({ on, onClick, color = "var(--accent)" }) {
   return (
@@ -281,6 +343,8 @@ function ApprovalsScreen({ approvals = [], onCoSign, onDecline, go } = {}) {
         <span className="tag" style={{ color: "var(--accent)" }}>MIDEN GUARDIAN · OPENZEPPELIN</span>
         <h1 style={{ fontFamily: "var(--disp)", fontWeight: 700, fontSize: 30, letterSpacing: "-0.02em", color: "var(--text)", margin: "10px 0 6px" }}>Guardian approvals</h1>
         <p style={{ fontSize: 14.5, color: "var(--muted)", margin: "0 0 24px", maxWidth: 620 }}>When an agent wants to act beyond its risk cap, it can't sign alone. The trade waits here for a human co-sign — a real 2-of-N multisig, verified on-chain by the Guardian, before any capital is authorized.</p>
+
+        <GuardianIdentityCard />
 
         {approvals.length === 0 ? (
           <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--faint)", border: "1px dashed var(--hair-2)", borderRadius: "var(--r)" }}>
