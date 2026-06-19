@@ -221,6 +221,27 @@ function useWallet() {
   // signal to rebuild the faucet with the current SDK rather than a hard fail.
   const isStaleCodeError = (e) =>
     /could not be found|procedure with root|MASM|kernel|deserializ|incompatible/i.test(String(e?.message || e));
+  // Transient: a proof/submit aborted by a concurrent WASM read, or a flaky
+  // testnet RPC/prover. Safe to retry the whole mint — a fresh attempt builds a
+  // new tx and re-proves from scratch.
+  const isTransientError = (e) =>
+    /BodyStreamBuffer|aborted|Failed to fetch|grpc request failed|prove transaction|submit proven|timeout|network/i.test(String(e?.message || e));
+  // Mint with retries: transient failures (proof aborted / RPC flake) get a
+  // short backoff and retry; a stale-faucet error rebuilds the faucet once.
+  const mintWithRetry = async (fid) => {
+    const doMint = (f) => wasmRetry(() => mint({ targetAccountId: address, faucetId: f, amount: parseAssetAmount("1000", FUND_DECIMALS), noteType: "private" }));
+    let f = fid;
+    for (let attempt = 1; attempt <= 4; attempt++) {
+      try { await doMint(f); return f; } // return the faucet actually used (may have been rebuilt)
+      catch (e) {
+        const msg = String(e?.message || e).split("\n")[0];
+        if (isStaleCodeError(e)) { console.warn("[fund] faucet unusable, recreating:", msg); f = await ensureFaucet(true); continue; }
+        if (isTransientError(e) && attempt < 4) { console.warn(`[fund] transient mint failure (${attempt}/4), retrying:`, msg); await new Promise((r) => setTimeout(r, 1500 * attempt)); continue; }
+        throw e;
+      }
+    }
+    return f;
+  };
 
   // Self-contained funding: mint test OBX from our own web-SDK faucet to the
   // wallet, then consume the note. Same toolchain end-to-end → the consume's
@@ -232,18 +253,10 @@ function useWallet() {
     try {
       let fid = await ensureFaucet();
       setFundMsg("Minting 1,000 OBX…");
-      const doMint = (f) => wasmRetry(() => mint({ targetAccountId: id, faucetId: f, amount: parseAssetAmount("1000", FUND_DECIMALS), noteType: "private" }));
-      try {
-        await doMint(fid);
-      } catch (e) {
-        // The persisted faucet went stale (couldn't mint) — rebuild a fresh one
-        // with the current SDK and mint from that. This is what unblocks "can't
-        // fund more"; the new faucet becomes the wallet's OBX going forward.
-        if (!isStaleCodeError(e)) throw e;
-        console.warn("[fund] faucet unusable, recreating:", String(e?.message || e).split("\n")[0]);
-        fid = await ensureFaucet(true);
-        await doMint(fid);
-      }
+      // mintWithRetry handles both a stale faucet (rebuild) and a transient proof
+      // abort / RPC flake (backoff + retry). The background poller is paused
+      // while `funding` is true, so a concurrent read can't abort the proof.
+      fid = await mintWithRetry(fid); // may rebuild the faucet — track the one used
       setFundMsg("Claiming…");
       // Only consume notes carrying OUR faucet's asset. A wallet may hold stale
       // notes from earlier attempts (e.g. a CLI-minted note) that the web client
@@ -427,14 +440,17 @@ function App() {
   React.useEffect(() => {
     if (isReady && client) window.__subrosaReadMarket = (hex) => readMarketState(client, hex || MARKET_ID_HEX);
   }, [isReady, client]);
-  // Pause background WASM reads while a co-sign proof is in flight (ref so the
-  // poller sees the latest value without restarting its interval).
-  const coSignActiveRef = React.useRef(false);
-  coSignActiveRef.current = !!coSignStep;
-  const live = useLiveMarkets(client, isReady, coSignActiveRef);
-  React.useEffect(() => { window.__subrosaLive = live; }, [live]);
   const [mfFunding, setMfFunding] = React.useState(false);
   const [mfFundMsg, setMfFundMsg] = React.useState(null);
+  // Pause background WASM reads while ANY heavy wallet op is in flight — a
+  // co-sign, a fund/mint, or a place. They drive long proofs on the shared WASM
+  // client, and a concurrent market read aborts the in-flight proof
+  // ("BodyStreamBuffer was aborted"). Ref so the poller sees the latest value
+  // without restarting its interval.
+  const walletBusyRef = React.useRef(false);
+  walletBusyRef.current = !!coSignStep || !!seal || builtin.funding || mfFunding;
+  const live = useLiveMarkets(client, isReady, walletBusyRef);
+  React.useEffect(() => { window.__subrosaLive = live; }, [live]);
 
   // Fund the EXTERNAL MidenFi wallet: our web client mints a public OBX note to
   // its address (we hold the faucet key), then the extension consumes it via
