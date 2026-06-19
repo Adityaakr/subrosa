@@ -134,6 +134,10 @@ function useWallet() {
   const [faucetId, setFaucetId] = React.useState(() => {
     try { return localStorage.getItem(FAUCET_LS); } catch (e) { return null; }
   });
+  // Soft "disconnected" toggle. The built-in wallet is a persistent identity —
+  // disconnect must NOT destroy it (that was the "new wallet every click" bug),
+  // it only hides the session. Reconnecting reuses the SAME account.
+  const [off, setOff] = React.useState(false);
   const [connecting, setConnecting] = React.useState(false);
   const [funding, setFunding] = React.useState(false);
   const [fundMsg, setFundMsg] = React.useState(null);
@@ -174,6 +178,7 @@ function useWallet() {
 
   const connect = async () => {
     setError(null);
+    setOff(false); // re-enable the session
     if (account) return account;
     setConnecting(true);
     try {
@@ -199,11 +204,9 @@ function useWallet() {
     } finally { setConnecting(false); }
   };
 
-  const disconnect = () => {
-    acctRef.current = null;
-    try { localStorage.removeItem(WALLET_LS); } catch (e) {}
-    setWalletId(null);
-  };
+  // Soft disconnect: keep the persisted id + account so the SAME wallet comes
+  // back on reconnect. (To truly forget it the user would clear site data.)
+  const disconnect = () => setOff(true);
 
   // Reuse the persisted test faucet if it's still in the store, else create one.
   // maxSupply is in BASE units and must exceed everything we ever mint:
@@ -326,7 +329,7 @@ function useWallet() {
   };
 
   return {
-    connected: !!account || !!walletId, connecting, funding, fundMsg, error,
+    connected: (!!account || !!walletId) && !off, connecting, funding, fundMsg, error,
     walletId: address, account, faucetId,
     balance, balanceLabel: formatAssetAmount(balance, FUND_DECIMALS),
     connect, disconnect, fund, mintTo, refetch: q.refetch,

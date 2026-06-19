@@ -197,6 +197,55 @@ function ThemeToggle() {
 /* ---------- top bar ---------- */
 function shortId(s) { return s && s.length > 12 ? `${s.slice(0, 6)}…${s.slice(-4)}` : (s || ""); }
 
+// Connected-wallet pill + dropdown: full address, copy, view on Midenscan,
+// disconnect. Disconnect is a SOFT toggle for the built-in wallet — the same
+// account returns on reconnect (it is never regenerated).
+function WalletMenu({ w }) {
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const addr = w.walletId || "";
+  const isMf = w.kind === "midenfi";
+  const explorer = `${EXPLORER}/account/${addr}`;
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(addr); } catch (e) { try { const t = document.createElement("textarea"); t.value = addr; document.body.appendChild(t); t.select(); document.execCommand("copy"); t.remove(); } catch (e2) {} }
+    setCopied(true); setTimeout(() => setCopied(false), 1600);
+  };
+  const item = { display: "flex", alignItems: "center", gap: 9, width: "100%", textAlign: "left", padding: "9px 10px", borderRadius: "var(--r-sm)", border: "none", background: "transparent", cursor: "pointer", color: "var(--text)", fontSize: 13, textDecoration: "none" };
+  const hov = (e, on) => (e.currentTarget.style.background = on ? "var(--bg-2)" : "transparent");
+  return (
+    <div style={{ position: "relative" }}>
+      <button onClick={() => setOpen((o) => !o)} title="Wallet options"
+        style={{ display: "flex", alignItems: "center", gap: 8, height: 36, padding: "0 10px 0 12px", borderRadius: "var(--r-md)", border: "1px solid var(--hair-2)", background: open ? "var(--bg-2)" : "var(--surface-2)", color: "var(--text)", cursor: "pointer" }}>
+        <span style={{ width: 18, height: 18, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", flex: "none", background: isMf ? "#0C0C0E" : "linear-gradient(135deg,#FF5500,#A300D6)", fontFamily: "var(--disp)", fontWeight: 700, color: "var(--accent)", fontSize: 11 }}>{isMf ? "m" : ""}</span>
+        <span className="mono" style={{ fontSize: 12.5 }}>{shortId(addr)}</span>
+        <window.Icon name="chevron-down" size={14} color="var(--faint)" />
+      </button>
+      {open ? (
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+          <div style={{ position: "absolute", top: 44, right: 0, width: 312, zIndex: 41, background: "var(--surface)", border: "1px solid var(--hair-2)", borderRadius: "var(--r-md)", boxShadow: "0 20px 50px rgba(12,12,14,0.22)", padding: 8, animation: "fadeUp 0.18s ease both" }}>
+            <div className="tag" style={{ color: "var(--faint)", padding: "8px 10px 6px" }}>{isMf ? "MIDEN WALLET" : "SUBROSA WALLET"}</div>
+            <div className="mono" style={{ fontSize: 11.5, color: "var(--text)", padding: "0 10px 10px", wordBreak: "break-all", lineHeight: 1.5 }}>{addr}</div>
+            <button onClick={copy} style={item} onMouseEnter={(e) => hov(e, true)} onMouseLeave={(e) => hov(e, false)}>
+              <window.Icon name={copied ? "check" : "copy"} size={15} color={copied ? "var(--yes)" : "var(--faint)"} />
+              {copied ? "Copied ✓" : "Copy address"}
+            </button>
+            <a href={explorer} target="_blank" rel="noreferrer" onClick={() => setOpen(false)} style={item} onMouseEnter={(e) => hov(e, true)} onMouseLeave={(e) => hov(e, false)}>
+              <window.Icon name="external-link" size={15} color="var(--faint)" />
+              View on Midenscan
+            </a>
+            <div style={{ height: 1, background: "var(--hair)", margin: "6px 4px" }} />
+            <button onClick={() => { setOpen(false); w.disconnect && w.disconnect(); }} style={{ ...item, color: "var(--no)" }} onMouseEnter={(e) => hov(e, true)} onMouseLeave={(e) => hov(e, false)}>
+              <window.Icon name="x" size={15} color="var(--no)" />
+              Disconnect
+            </button>
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 function WalletChooser({ w, onClose }) {
   return (
     <>
@@ -255,11 +304,7 @@ function TopBar({ left, wallet }) {
             <button className="fund-btn" onClick={() => w.fund && w.fund()} disabled={w.funding} title="Mint test OBX to this wallet" style={{ display: "flex", alignItems: "center", gap: 6, height: 36, padding: "0 12px", borderRadius: "var(--r-md)", border: "1px solid var(--hair-2)", background: "var(--surface-2)", color: "var(--text)", fontSize: 13, fontWeight: 500, cursor: w.funding ? "default" : "pointer", opacity: w.funding ? 0.7 : 1 }}>
               <window.Icon name="plus" size={14} color="var(--accent)" /><span className="fund-label">{w.funding ? "Funding…" : "Fund"}</span>
             </button>
-            <button onClick={() => w.disconnect && w.disconnect()} title={`${w.kind === "midenfi" ? "Miden Wallet" : "Subrosa Wallet"} — click to disconnect`} style={{ display: "flex", alignItems: "center", gap: 8, height: 36, padding: "0 10px 0 12px", borderRadius: "var(--r-md)", border: "1px solid var(--hair-2)", background: "var(--surface-2)", color: "var(--text)", cursor: "pointer" }}>
-              <span style={{ width: 18, height: 18, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", flex: "none", background: w.kind === "midenfi" ? "#0C0C0E" : "linear-gradient(135deg,#FF5500,#A300D6)", fontFamily: "var(--disp)", fontWeight: 700, color: "var(--accent)", fontSize: 11 }}>{w.kind === "midenfi" ? "m" : ""}</span>
-              <span className="mono" style={{ fontSize: 12.5 }}>{shortId(w.walletId)}</span>
-              <window.Icon name="chevron-down" size={14} color="var(--faint)" />
-            </button>
+            <WalletMenu w={w} />
           </>
         )}
       </div>
