@@ -622,7 +622,6 @@ function App() {
   const placeCoSignedBet = async (order, marketHex, placeId) => {
     const masp = order.side === "YES" ? "/packages/place_note.masp" : "/packages/place_no_note.masp";
     const buf = await fetch(masp).then((r) => r.arrayBuffer());
-    const faucetHex = (() => { try { return localStorage.getItem(FAUCET_LS); } catch (e) { return null; } })();
     // Capture the note serial as stable u64s: the producer flow executes the
     // request twice (propose + execute) and the commitments MUST match, so every
     // rebuild has to be byte-identical. A BigUint64Array is plain JS (not a
@@ -633,12 +632,13 @@ function App() {
       const senderId = AccountId.fromHex(String(accountId));
       const mid = AccountId.fromHex(marketHex);
       const ns = NoteScript.fromPackage(Package.deserialize(new Uint8Array(buf)));
-      let assets;
-      try {
-        assets = (faucetHex && order.amount > 0)
-          ? new NoteAssets([new FungibleAsset(toAccountId(faucetHex), parseAssetAmount(String(order.amount), FUND_DECIMALS))])
-          : new NoteAssets();
-      } catch (e) { assets = new NoteAssets(); }
+      // The Guardian account is a fresh 2-of-N that holds no OBX of its own, so
+      // the co-signed bet is an EMPTY private position note — a real, on-chain,
+      // Guardian-co-signed commitment. Its stake/size stays private metadata
+      // (like every position here); we don't move assets out of the multisig
+      // vault, which would underflow. (Funding the account to stake real OBX is
+      // a separate co-signed consume flow.)
+      const assets = new NoteAssets();
       const rec = new NoteRecipient(new Word(serialU64), ns, new NoteStorage(new FeltArray()));
       const meta = new NoteMetadata(senderId, NoteType.Private, NoteTag.withAccountTarget(mid));
       const note = new Note(assets, meta, rec);
@@ -661,7 +661,7 @@ function App() {
     window.txToast?.({
       kind: "cosign",
       title: `${order.side} position co-signed · Guardian`,
-      desc: `Placed FROM your 2-of-N Guardian account ${shortHex(r.multisig)} — agent + you + Guardian all signed the bet itself. The chain records only its commitment; side, size and owner stay private.`,
+      desc: `Placed FROM your 2-of-N Guardian account ${shortHex(r.multisig)} — agent + you + Guardian all signed the bet itself. The chain records only its commitment; your side, size (${order.amount} OBX) and owner stay private.`,
       account: r.multisig,
     });
   };
