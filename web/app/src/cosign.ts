@@ -43,6 +43,24 @@ function saveIdentity(v) { try { localStorage.setItem(KEYS_LS, JSON.stringify(v)
 const signerFrom = (key64) => new FalconSigner(AuthSecretKey.deserialize(b64dec(key64)));
 const guardianEndpoint = () => `${typeof window !== "undefined" ? window.location.origin : ""}/guardian`;
 
+// rpoFalconWithRNG(undefined) seeds from a DEFAULT and returns the SAME key on
+// every call — which would make the two cosigners identical (signerCommitments
+// [X, X]) and the 2nd signature a duplicate ("proposal_already_signed", 409).
+// Always seed from fresh CSPRNG bytes so each key is distinct.
+const randSeed = () => {
+  const b = new Uint8Array(32);
+  (globalThis.crypto || window.crypto).getRandomValues(b);
+  return b;
+};
+function freshKey() { return AuthSecretKey.rpoFalconWithRNG(randSeed()); }
+// Generate two keys whose commitments are guaranteed different.
+function freshCosignerKeys() {
+  const a = freshKey();
+  let h = freshKey();
+  for (let i = 0; i < 5 && new FalconSigner(h).commitment === new FalconSigner(a).commitment; i++) h = freshKey();
+  return { agentKey: a, humanKey: h };
+}
+
 // ── Single cached Miden client + a mutex ────────────────────────────────────
 // The WASM client is single-instance: two concurrent calls crash with
 // "recursive use". We keep ONE dedicated MidenClient for all Guardian work and
@@ -95,7 +113,14 @@ async function openBettingAccount(step) {
   const client = newGuardianClient(miden);
   const stored = loadIdentity();
 
-  if (stored && stored.agent && stored.human) {
+  // A stored identity is only usable if its two cosigners are DISTINCT. Earlier
+  // builds generated both keys with rpoFalconWithRNG(undefined), so some saved
+  // identities have two identical signers and can never reach threshold 2 —
+  // detect that and rebuild a fresh account instead of looping on 409s.
+  const storedUsable = !!(stored && stored.agent && stored.human) &&
+    (() => { try { return signerFrom(stored.agent).commitment !== signerFrom(stored.human).commitment; } catch (e) { return false; } })();
+
+  if (storedUsable) {
     const agent = signerFrom(stored.agent);
     const human = signerFrom(stored.human);
     let accountId = stored.multisig || null;
@@ -118,10 +143,10 @@ async function openBettingAccount(step) {
     return { client, multisig, asHuman, accountId: String(accountId), reused: true };
   }
 
-  // First time: mint a fresh 2-of-N, register it on Guardian, persist the keys.
+  // First time (or rebuilding a broken identity): mint a fresh 2-of-N with two
+  // DISTINCT cosigner keys, register it on Guardian, persist the keys.
   step && step("Creating your Guardian account…");
-  const agentKey = AuthSecretKey.rpoFalconWithRNG(undefined);
-  const humanKey = AuthSecretKey.rpoFalconWithRNG(undefined);
+  const { agentKey, humanKey } = freshCosignerKeys();
   const agent = new FalconSigner(agentKey);
   const human = new FalconSigner(humanKey);
   const gp = await client.guardianClient.getPubkey();
