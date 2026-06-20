@@ -5,10 +5,10 @@ import { useWallet as useMidenFiAdapter } from "@miden-sdk/miden-wallet-adapter-
 import { WalletAdapterNetwork, PrivateDataPermission } from "@miden-sdk/miden-wallet-adapter-base";
 import {
   AccountId, Package, NoteScript, Note, NoteAssets, NoteMetadata, FungibleAsset,
-  NoteRecipient, NoteStorage, NoteTag, NoteType, NoteArray, FeltArray, TransactionRequestBuilder,
+  NoteRecipient, NoteStorage, NoteTag, NoteType, NoteArray, FeltArray, TransactionRequestBuilder, Word,
 } from "@miden-sdk/miden-sdk";
 import { randomWord } from "../lib/miden";
-import { guardianCoSign } from "../cosign";
+import { guardianCoSign, coSignSubmitBet } from "../cosign";
 
 const MARKET_ID_HEX = "0x5ff0303f0b795d1039ca5b51d8480b";
 const OBX_FAUCET_HEX = "0x1201d9f8819d5220778535e4e2f08a";
@@ -614,6 +614,58 @@ function App() {
     }
   };
 
+  // Place a bet FROM the Guardian multisig (the article model): build the
+  // place-note deterministically so the summary proposed to Guardian matches the
+  // one executed, co-sign agent + you + Guardian via the producer API, and
+  // submit. Records the position on success; THROWS on any failure so place()
+  // can fall back to a direct single-sig wallet bet.
+  const placeCoSignedBet = async (order, marketHex, placeId) => {
+    const masp = order.side === "YES" ? "/packages/place_note.masp" : "/packages/place_no_note.masp";
+    const buf = await fetch(masp).then((r) => r.arrayBuffer());
+    const faucetHex = (() => { try { return localStorage.getItem(FAUCET_LS); } catch (e) { return null; } })();
+    // Capture the note serial as stable u64s: the producer flow executes the
+    // request twice (propose + execute) and the commitments MUST match, so every
+    // rebuild has to be byte-identical. A BigUint64Array is plain JS (not a
+    // moved WASM handle), so we can reconstruct a fresh Word from it each call.
+    const serialU64 = BigUint64Array.from(Array.from({ length: 4 }, () => BigInt(Math.floor(Math.random() * 2 ** 32))));
+
+    const buildRequest = (accountId, advice) => {
+      const senderId = AccountId.fromHex(String(accountId));
+      const mid = AccountId.fromHex(marketHex);
+      const ns = NoteScript.fromPackage(Package.deserialize(new Uint8Array(buf)));
+      let assets;
+      try {
+        assets = (faucetHex && order.amount > 0)
+          ? new NoteAssets([new FungibleAsset(toAccountId(faucetHex), parseAssetAmount(String(order.amount), FUND_DECIMALS))])
+          : new NoteAssets();
+      } catch (e) { assets = new NoteAssets(); }
+      const rec = new NoteRecipient(new Word(serialU64), ns, new NoteStorage(new FeltArray()));
+      const meta = new NoteMetadata(senderId, NoteType.Private, NoteTag.withAccountTarget(mid));
+      const note = new Note(assets, meta, rec);
+      let b = new TransactionRequestBuilder().withOwnOutputNotes(new NoteArray([note]));
+      if (advice) b = b.extendAdviceMap(advice);
+      return b.build();
+    };
+
+    const r = await coSignSubmitBet({ buildRequest, onStep: (m) => { console.log("[cosign]", m); setCoSignStep(m); } });
+    setCoSignStep(null);
+    addCoSignId(r.multisig); // it's a 2-of-N multisig, never a single-sig wallet
+
+    let noteId = null;
+    try { noteId = buildRequest(r.multisig, null).expectedOutputOwnNotes()[0]?.id()?.toString() ?? null; } catch (e) {}
+
+    const rt = { tx: null, account: r.multisig, marketHex, noteId, coSignMultisig: r.multisig };
+    setRealTx(rt);
+    upsertPosition(buildPosition({ ...order, placeId }, rt, true)); // success only
+    setTimeout(() => { try { builtin.refetch?.(); } catch (e) {} }, 2500);
+    window.txToast?.({
+      kind: "cosign",
+      title: `${order.side} position co-signed · Guardian`,
+      desc: `Placed FROM your 2-of-N Guardian account ${shortHex(r.multisig)} — agent + you + Guardian all signed the bet itself. The chain records only its commitment; side, size and owner stay private.`,
+      account: r.multisig,
+    });
+  };
+
   const place = (order) => {
     setRealTx(null);
     const placeId = "p-" + Math.random().toString(36).slice(2, 7); // stable id to patch later
@@ -622,14 +674,36 @@ function App() {
     // Guardian co-sign must complete first — then the staked bet is sealed.
     (async () => {
       let coSignMultisig = null;
-      if (order.protect) {
+      const marketHex0 = (order.market && LIVE_MARKETS[order.market.id]) || MARKET_ID_HEX;
+
+      // ── Article model: built-in wallet + Guardian protection ──────────────
+      // The BET ITSELF is the co-signed transaction — the place-note is built
+      // FROM your 2-of-N Guardian account and co-signed agent + you + Guardian
+      // via the producer API, then submitted. If anything in that path fails
+      // (Guardian down, account unfunded), we fall back to a direct single-sig
+      // place so a bet never gets stuck.
+      if (order.protect && !mf.connected) {
+        setSeal({ order: { ...order, placeId } });
+        try {
+          await placeCoSignedBet(order, marketHex0, placeId);
+          return; // success toast + position recorded inside
+        } catch (e) {
+          console.warn("[cosign place] falling back to single-sig:", e?.message || e);
+          setCoSignStep(null);
+          window.txToast?.({ kind: "cosign", title: "Guardian path unavailable — placing directly", desc: "Couldn't co-sign from your Guardian account (is the Guardian server up?). Placing from your wallet instead." });
+          // fall through to the built-in single-sig place below
+        }
+      } else if (order.protect && mf.connected) {
+        // MidenFi is the signer (the extension proves the tx), so the producer
+        // flow doesn't apply — run the real 2-of-N + Guardian ceremony co-sign,
+        // then stake from the extension wallet.
         setCoSignStep("Connecting to Guardian…");
         try {
           const r = await guardianCoSign((m) => { console.log("[cosign]", m); setCoSignStep(m); });
           coSignMultisig = r.multisig;
           addCoSignId(r.multisig); // never let the wallet adopt this multisig
           setCoSignStep(null);
-          window.txToast?.({ kind: "cosign", title: "Guardian co-signed ✓", desc: `2-of-N approved via your ${r.reused ? "" : "new "}Guardian multisig ${shortHex(coSignMultisig)}. Sealing your position…`, account: coSignMultisig });
+          window.txToast?.({ kind: "cosign", title: "Guardian co-signed ✓", desc: `2-of-N approved via your ${r.reused ? "" : "new "}Guardian account ${shortHex(coSignMultisig)}. Sealing your position…`, account: coSignMultisig });
         } catch (e) {
           console.warn("[cosign] failed:", e);
           setCoSignStep(null);

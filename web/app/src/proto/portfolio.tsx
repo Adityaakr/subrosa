@@ -37,7 +37,7 @@ function GuardianIdentityCard() {
     } catch (e) { flash(String(e?.message || e)); }
   };
   const forget = () => {
-    if (!window.confirm("Forget this Guardian multisig? Without a backup you can't recover it — the next co-sign creates a new one.")) return;
+    if (!window.confirm("Forget this Guardian account? Without a backup you can't recover it — your next protected bet creates a new one.")) return;
     resetGuardianIdentity(); setTick((t) => t + 1); flash("Identity cleared.");
   };
 
@@ -45,11 +45,11 @@ function GuardianIdentityCard() {
     <div style={{ border: "1px solid var(--hair-2)", borderRadius: "var(--r)", padding: "16px 18px", marginBottom: 24, background: "var(--surface)" }}>
       <div className="grid-2" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, flexWrap: "wrap" }}>
         <div style={{ minWidth: 0 }}>
-          <div className="tag" style={{ color: "var(--faint)", marginBottom: 4 }}>YOUR GUARDIAN MULTISIG</div>
+          <div className="tag" style={{ color: "var(--faint)", marginBottom: 4 }}>YOUR GUARDIAN BETTING ACCOUNT · 2-of-N</div>
           {has ? (
-            <span className="mono" title={id} style={{ fontSize: 13, color: "var(--text)" }}>{id && id.length > 18 ? `${id.slice(0, 12)}…${id.slice(-6)}` : id}</span>
+            <span className="mono" title={id} style={{ fontSize: 13, color: "var(--text)" }}>{id && id.length > 18 ? `${id.slice(0, 12)}…${id.slice(-6)}` : (id || "keys saved · account on next bet")}</span>
           ) : (
-            <span style={{ fontSize: 13, color: "var(--muted)" }}>Created on your first co-sign, then reused every time.</span>
+            <span style={{ fontSize: 13, color: "var(--muted)" }}>Created on your first protected bet — agent + you, Guardian-co-signed. Reused & recoverable every time.</span>
           )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
@@ -159,6 +159,8 @@ function PositionsScreen({ positions, balance, go, live, onRedeem }) {
           <SummaryCard label="Open positions" value={String(all.length)} />
           <SummaryCard label="Visible on-chain" value="0" sub="commitments only" />
         </div>
+
+        <GuardianIdentityCard />
 
         <div className="pos-table" style={{ background: "var(--surface)", border: "1px solid var(--hair)", borderRadius: "var(--r)", overflow: "hidden" }}>
           <div className="pos-row" style={{ display: "grid", gridTemplateColumns: "2.3fr 0.7fr 0.8fr 1fr 1fr 1.4fr", gap: 14, padding: "12px 20px", borderBottom: "1px solid var(--hair)", background: "var(--bg-2)" }}>
