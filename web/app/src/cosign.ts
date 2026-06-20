@@ -85,6 +85,20 @@ function newGuardianClient(miden) {
   return new MultisigClient(miden, { guardianEndpoint: guardianEndpoint(), midenRpcEndpoint: RPC });
 }
 
+// Sign a proposal, treating "already signed by this cosigner" as success. The
+// proposal commitment is deterministic (same bet summary → same id), so a retry
+// re-signs the SAME proposal and Guardian replies 409 proposal_already_signed —
+// which means the signature we wanted is already on file. Swallow only that
+// case; surface everything else.
+async function signOnce(m, id) {
+  try { await m.signProposal(id); }
+  catch (e) {
+    const s = String((e && (e.message || e.body || e)) || "");
+    if (/already.?signed|proposal_already_signed/i.test(s)) return;
+    throw e;
+  }
+}
+
 // ── Backup / restore (key management for Guardian signing) ──────────────────
 export function hasGuardianIdentity() {
   const s = loadIdentity();
@@ -213,8 +227,8 @@ export async function fundBettingAccount({ mintObx, onStep }) {
 
     step("Claiming funds (Guardian co-sign)…");
     const proposal = await multisig.createConsumeNotesProposal(ids);
-    await multisig.signProposal(proposal.id);
-    await asHuman.signProposal(proposal.id);
+    await signOnce(multisig, proposal.id);
+    await signOnce(asHuman, proposal.id);
     step("Executing on-chain…");
     await asHuman.executeProposal(proposal.id);
     return { multisig: accountId, claimed: ids.length };
@@ -253,8 +267,8 @@ export async function coSignSubmitBet({ buildRequest, onStep }) {
     const proposal = await multisig.createCustomProposal(bytes, "place_bet");
 
     step("Collecting signatures…");
-    await multisig.signProposal(proposal.id);   // agent (hot key)
-    await asHuman.signProposal(proposal.id);     // human key → threshold met
+    await signOnce(multisig, proposal.id);   // agent (hot key)
+    await signOnce(asHuman, proposal.id);     // human key → threshold met
 
     step("Guardian co-signing…");
     const advice = await multisig.prepareCustomExecution(proposal.id, bytes);
@@ -278,8 +292,8 @@ export async function guardianCoSign(onStep) {
     step("Collecting signatures…");
     const target = Number(multisig.threshold) > 0 ? Number(multisig.threshold) : 2;
     const proposal = await multisig.createChangeThresholdProposal(target);
-    await multisig.signProposal(proposal.id);
-    await asHuman.signProposal(proposal.id);
+    await signOnce(multisig, proposal.id);
+    await signOnce(asHuman, proposal.id);
     step("Executing co-sign on-chain…");
     await asHuman.executeProposal(proposal.id);
     return { multisig: accountId, reused };
