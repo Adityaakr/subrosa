@@ -128,7 +128,23 @@ export function resetGuardianIdentity() { try { localStorage.removeItem(KEYS_LS)
 // account is ready to transact.
 async function openBettingAccount(step) {
   const miden = await getMiden();
-  const client = newGuardianClient(miden);
+  // CRITICAL: each cosigner needs its OWN MultisigClient. client.load() calls
+  // _guardianClient.setSigner(signer), and the returned Multisig shares that
+  // guardian client — so loading agent then human on ONE client leaves BOTH
+  // Multisigs authenticating to Guardian as the LAST signer (human). Guardian
+  // then attributes both proposal signatures to that one identity → 409
+  // "already signed" and only 1 of 2 collected. Separate clients keep agent's
+  // and human's guardian auth independent.
+  const clientA = newGuardianClient(miden); // agent's client
+  const clientH = newGuardianClient(miden); // human's client
+
+  // Load the account once per cosigner, each on its own client.
+  const loadPair = async (accountId, agent, human) => {
+    const multisig = await clientA.load(String(accountId), agent);
+    try { await multisig.syncState(); } catch (e) { /* nothing to sync yet */ }
+    const asHuman = await clientH.load(String(accountId), human);
+    return { client: clientA, multisig, asHuman, accountId: String(accountId) };
+  };
 
   // Mint a fresh 2-of-N with two DISTINCT cosigner keys, register on Guardian,
   // persist the keys. Used first-time AND to rebuild any broken account.
@@ -137,17 +153,18 @@ async function openBettingAccount(step) {
     const { agentKey, humanKey } = freshCosignerKeys();
     const agent = new FalconSigner(agentKey);
     const human = new FalconSigner(humanKey);
-    const gp = await client.guardianClient.getPubkey();
+    const gp = await clientA.guardianClient.getPubkey();
     const guardianCommitment = typeof gp === "string" ? gp : gp.commitment;
-    const multisig = await client.create(
+    const created = await clientA.create(
       { threshold: 2, signerCommitments: [agent.commitment, human.commitment], guardianCommitment, guardianEnabled: true },
       agent,
     );
-    await multisig.registerOnGuardian();
-    const accountId = String(multisig.accountId ?? multisig.id ?? "");
+    await created.registerOnGuardian();
+    const accountId = String(created.accountId ?? created.id ?? "");
     saveIdentity({ agent: b64enc(agentKey.serialize()), human: b64enc(humanKey.serialize()), multisig: accountId, createdAt: new Date().toISOString() });
-    const asHuman = await client.load(accountId, human);
-    return { client, multisig, asHuman, accountId, reused: false };
+    // Re-load both from their own clients so each guardian client is bound to
+    // the correct cosigner before any signProposal runs.
+    return { ...(await loadPair(accountId, agent, human)), reused: false };
   };
 
   const stored = loadIdentity();
@@ -158,8 +175,6 @@ async function openBettingAccount(step) {
   catch (e) { return createFresh(); }
 
   // Saved keys must be two DISTINCT signers, else threshold 2 is unreachable.
-  // (Older builds seeded both keys with rpoFalconWithRNG(undefined) → identical
-  // keys → the 2nd signature is a duplicate → Guardian 409 "already signed".)
   if (String(agent.commitment).toLowerCase() === String(human.commitment).toLowerCase()) return createFresh();
 
   let accountId = stored.multisig || null;
@@ -168,7 +183,7 @@ async function openBettingAccount(step) {
   if (!accountId) {
     step && step("Recovering your account from Guardian…");
     try {
-      const found = await client.recoverByKey(agent);
+      const found = await clientA.recoverByKey(agent);
       if (found && found.length) accountId = found[0].accountId;
     } catch (e) {}
     if (!accountId) return createFresh();
@@ -176,23 +191,18 @@ async function openBettingAccount(step) {
   }
 
   step && step("Loading your Guardian account…");
-  let multisig;
-  try {
-    multisig = await client.load(String(accountId), agent);
-    try { await multisig.syncState(); } catch (e) { /* nothing to sync yet */ }
-  } catch (e) { return createFresh(); }
+  let pair;
+  try { pair = await loadPair(String(accountId), agent, human); }
+  catch (e) { return createFresh(); }
 
   // Self-heal: if the ACCOUNT itself was registered with duplicate/mismatched
-  // signers (a broken account from an earlier build), rebuild a valid one rather
-  // than loop on 409s.
-  const sc = (multisig.signerCommitments || []).map((s) => String(s).toLowerCase());
+  // signers (a broken account from an earlier build), rebuild a valid one.
+  const sc = (pair.multisig.signerCommitments || []).map((s) => String(s).toLowerCase());
   const a = String(agent.commitment).toLowerCase();
   const h = String(human.commitment).toLowerCase();
-  const accountOk = new Set(sc).size >= 2 && sc.includes(a) && sc.includes(h);
-  if (!accountOk) return createFresh();
+  if (!(new Set(sc).size >= 2 && sc.includes(a) && sc.includes(h))) return createFresh();
 
-  const asHuman = await client.load(String(accountId), human);
-  return { client, multisig, asHuman, accountId: String(accountId), reused: true };
+  return { ...pair, reused: true };
 }
 
 // Just ensure the account exists (used to fund it / show its address) without
