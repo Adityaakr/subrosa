@@ -29,7 +29,7 @@ const RPC = "https://rpc.testnet.miden.io";
 // so those accounts were registered with two identical signers and can never
 // reach threshold 2 (Guardian 409 "already signed"). v2 forces a clean rebuild
 // with two distinct CSPRNG-seeded keys; the broken v1 account is never touched.
-const KEYS_LS = "subrosa.guardian.identity.v2"; // { agent, human, multisig, createdAt }
+const KEYS_LS = "subrosa.guardian.identity.v3"; // { agent, human, multisig, createdAt }
 
 // ── base64 <-> Uint8Array (chunked, so a multi-KB Falcon key never overflows
 // the call stack via String.fromCharCode(...spread)). ──────────────────────
