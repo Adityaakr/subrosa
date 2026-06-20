@@ -290,8 +290,15 @@ export async function guardianCoSign(onStep) {
   return exclusive(async () => {
     const { multisig, asHuman, accountId, reused } = await openBettingAccount(step);
     step("Collecting signatures…");
-    const target = Number(multisig.threshold) > 0 ? Number(multisig.threshold) : 2;
-    const proposal = await multisig.createChangeThresholdProposal(target);
+    // A real, valid, repeatable 2-of-N action that EXECUTES on-chain: add a
+    // fresh (throwaway) signer commitment while keeping the threshold at 2.
+    // Unlike a no-op change-threshold (the SDK rejects "same threshold"), this
+    // is always a distinct valid state change — a unique tx summary every time
+    // (so no proposal ever gets stuck), it advances the account nonce, and it
+    // still requires BOTH cosigners to sign. The added commitment's key is never
+    // needed; threshold stays 2-of-N (agent + you).
+    const freshCommitment = new FalconSigner(freshKey()).commitment;
+    const proposal = await multisig.createAddSignerProposal(freshCommitment);
     await signOnce(multisig, proposal.id);
     await signOnce(asHuman, proposal.id);
     step("Executing co-sign on-chain…");
