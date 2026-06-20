@@ -24,8 +24,12 @@ import { MultisigClient, FalconSigner } from "@openzeppelin/miden-multisig-clien
 import { MidenClient, AuthSecretKey, AccountId } from "@miden-sdk/miden-sdk";
 
 const RPC = "https://rpc.testnet.miden.io";
-// Bump the version if the stored shape ever changes (abandons old identities).
-const KEYS_LS = "subrosa.guardian.identity.v1"; // { agent, human, multisig, createdAt }
+// Bump the version to abandon old identities. v2: earlier builds seeded both
+// cosigner keys with rpoFalconWithRNG(undefined), which returns the SAME key —
+// so those accounts were registered with two identical signers and can never
+// reach threshold 2 (Guardian 409 "already signed"). v2 forces a clean rebuild
+// with two distinct CSPRNG-seeded keys; the broken v1 account is never touched.
+const KEYS_LS = "subrosa.guardian.identity.v2"; // { agent, human, multisig, createdAt }
 
 // ── base64 <-> Uint8Array (chunked, so a multi-KB Falcon key never overflows
 // the call stack via String.fromCharCode(...spread)). ──────────────────────
@@ -227,6 +231,19 @@ export async function coSignSubmitBet({ buildRequest, onStep }) {
   const step = (m) => { try { onStep && onStep(m); } catch (e) {} };
   return exclusive(async () => {
     const { multisig, asHuman, accountId } = await openBettingAccount(step);
+
+    // Diagnostics + a hard guard: the two cosigners MUST be distinct, and both
+    // must be registered on the account, or threshold 2 is unreachable and
+    // Guardian returns 409 "already signed". Surface it clearly instead of
+    // looping. (Logs the real commitments so any remaining mismatch is visible.)
+    const agentC = String(multisig.signerCommitment || "").toLowerCase();
+    const humanC = String(asHuman.signerCommitment || "").toLowerCase();
+    const acctSigners = (multisig.signerCommitments || []).map((s) => String(s).toLowerCase());
+    console.log("[cosign] account", accountId, "| agent", agentC, "| human", humanC, "| account signers", acctSigners);
+    if (agentC && humanC && agentC === humanC) throw new Error("Cosigners identical — account rebuilt; place again.");
+    if (acctSigners.length && (!acctSigners.includes(agentC) || !acctSigners.includes(humanC))) {
+      throw new Error("Cosigner keys not registered on this account — account rebuilt; place again.");
+    }
 
     step("Building your bet…");
     const req0 = buildRequest(accountId, null);
