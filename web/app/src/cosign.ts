@@ -29,7 +29,13 @@ const RPC = "https://rpc.testnet.miden.io";
 // so those accounts were registered with two identical signers and can never
 // reach threshold 2 (Guardian 409 "already signed"). v2 forces a clean rebuild
 // with two distinct CSPRNG-seeded keys; the broken v1 account is never touched.
-const KEYS_LS = "subrosa.guardian.identity.v3"; // { agent, human, multisig, createdAt }
+// v4: the multisig client's syncProposals() re-validates EVERY pending proposal
+// on the account (verifyProposalMetadataBinding re-executes typed proposals like
+// add_signer against the current account state). A single stale/broken proposal
+// from an earlier build therefore poisons ALL future signing ("metadata does not
+// match tx_summary"). v4 abandons any v3 account that accumulated such proposals;
+// guardianCoSign additionally self-heals by rebuilding on any binding poison.
+const KEYS_LS = "subrosa.guardian.identity.v4"; // { agent, human, multisig, createdAt }
 
 // ── base64 <-> Uint8Array (chunked, so a multi-KB Falcon key never overflows
 // the call stack via String.fromCharCode(...spread)). ──────────────────────
@@ -99,6 +105,16 @@ async function signOnce(m, id) {
   }
 }
 
+// A "stale-proposal poison": syncProposals() re-validates every pending proposal
+// on the account and throws if any typed proposal no longer reconstructs to its
+// stored tx_summary (e.g. a leftover from an earlier build, or a prior proposal
+// gone stale after the account nonce advanced). When this happens the account is
+// effectively un-signable until those proposals clear — so we rebuild a clean one.
+function isStaleProposalPoison(e) {
+  const s = String((e && (e.message || e.body || e)) || "");
+  return /does not match tx_summary|Invalid proposal/i.test(s);
+}
+
 // ── Backup / restore (key management for Guardian signing) ──────────────────
 export function hasGuardianIdentity() {
   const s = loadIdentity();
@@ -126,7 +142,7 @@ export function resetGuardianIdentity() { try { localStorage.removeItem(KEYS_LS)
 // human-authorized twin (for the second signature), the account id, and whether
 // it was reused. State is synced from Guardian into the local store so the
 // account is ready to transact.
-async function openBettingAccount(step) {
+async function openBettingAccount(step, forceFresh = false) {
   const miden = await getMiden();
   // CRITICAL: each cosigner needs its OWN MultisigClient. client.load() calls
   // _guardianClient.setSigner(signer), and the returned Multisig shares that
@@ -166,6 +182,10 @@ async function openBettingAccount(step) {
     // the correct cosigner before any signProposal runs.
     return { ...(await loadPair(accountId, agent, human)), reused: false };
   };
+
+  // forceFresh: the caller hit a stale-proposal binding poison and wants a clean
+  // account (no pending proposals for syncProposals to choke on).
+  if (forceFresh) return createFresh();
 
   const stored = loadIdentity();
   if (!(stored && stored.agent && stored.human)) return createFresh();
@@ -297,16 +317,15 @@ export async function coSignSubmitBet({ buildRequest, onStep }) {
 // the producer API so the BET itself is what gets co-signed.
 export async function guardianCoSign(onStep) {
   const step = (m) => { try { onStep && onStep(m); } catch (e) {} };
-  return exclusive(async () => {
-    const { multisig, asHuman, accountId, reused } = await openBettingAccount(step);
+  // One real 2-of-N + Guardian co-sign that EXECUTES on-chain: add a fresh
+  // (throwaway) signer commitment while keeping the threshold at 2. Unlike a
+  // no-op change-threshold (the SDK rejects "same threshold"), this is always a
+  // distinct valid state change — a unique tx summary, it advances the account
+  // nonce, and it still requires BOTH cosigners. The added commitment's key is
+  // never needed; threshold stays 2-of-N (agent + you).
+  const run = async (forceFresh) => {
+    const { multisig, asHuman, accountId, reused } = await openBettingAccount(step, forceFresh);
     step("Collecting signatures…");
-    // A real, valid, repeatable 2-of-N action that EXECUTES on-chain: add a
-    // fresh (throwaway) signer commitment while keeping the threshold at 2.
-    // Unlike a no-op change-threshold (the SDK rejects "same threshold"), this
-    // is always a distinct valid state change — a unique tx summary every time
-    // (so no proposal ever gets stuck), it advances the account nonce, and it
-    // still requires BOTH cosigners to sign. The added commitment's key is never
-    // needed; threshold stays 2-of-N (agent + you).
     const freshCommitment = new FalconSigner(freshKey()).commitment;
     const proposal = await multisig.createAddSignerProposal(freshCommitment);
     await signOnce(multisig, proposal.id);
@@ -314,5 +333,17 @@ export async function guardianCoSign(onStep) {
     step("Executing co-sign on-chain…");
     await asHuman.executeProposal(proposal.id);
     return { multisig: accountId, reused };
+  };
+  return exclusive(async () => {
+    try {
+      return await run(false);
+    } catch (e) {
+      // A stale proposal on the account poisons syncProposals so nothing can be
+      // signed. Rebuild a clean account (no pending proposals) and retry once.
+      if (!isStaleProposalPoison(e)) throw e;
+      console.warn("[cosign] account poisoned by a stale proposal — rebuilding clean:", e);
+      step("Resetting a corrupted account…");
+      return await run(true);
+    }
   });
 }
