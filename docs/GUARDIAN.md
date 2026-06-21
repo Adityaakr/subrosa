@@ -74,8 +74,16 @@ make 2-of-2 actually reach threshold on-chain:
    proposal_already_signed`, stuck at "1 of 2"). Give the agent and human their own
    `MultisigClient` (`clientA` / `clientH`) so their Guardian auth is independent.
 
+3. **Self-heal on a poisoned account.** `signProposal` calls `syncProposals()`,
+   which re-validates **every** pending proposal on the account
+   (`verifyProposalMetadataBinding` re-executes typed proposals like `add_signer`
+   against the current account state). So a single stale proposal — left by an
+   earlier build, or gone stale after the nonce advanced — throws `metadata does
+   not match tx_summary` and poisons **all** future signing. `guardianCoSign`
+   catches that and rebuilds a clean account (no pending proposals) + retries once.
+
 A self-heal check plus an identity-version bump (`subrosa.guardian.identity.vN` in
-localStorage) abandons any account created by an earlier broken build.
+localStorage) also abandons any account created by an earlier broken build.
 
 ## Status / what's verified
 - ✅ Design + API grounded in the repo; `agent/` and `web/app/src/cosign.ts` written
