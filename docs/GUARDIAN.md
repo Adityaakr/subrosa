@@ -25,8 +25,10 @@ threshold is uniform (or per-procedure-root, not per-amount). So
 ## Packages (verified)
 - `@openzeppelin/miden-multisig-client@^0.14.9` — multisig + proposal/co-sign SDK
 - `@openzeppelin/guardian-client@^0.14.9` — lower-level HTTP client (backup/recovery)
-- peer: `@miden-sdk/miden-sdk@0.14.5` (exact pin the multisig client requires —
-  do **not** float to 0.15.x)
+- peer: `@miden-sdk/miden-sdk` — the multisig client bundles **no WASM of its own**
+  and depends on the app's copy. The dapp pins **one** version with an `overrides`
+  block in `web/app/package.json` (`"@miden-sdk/miden-sdk": "0.14.11"`); a second,
+  nested copy causes a WASM `LinkError` (`Import #294 "memory"`) at runtime.
 
 ## Run it — real on-chain co-sign in 3 commands
 ```bash
@@ -56,12 +58,33 @@ autonomous path and above-cap trades to this same propose→co-sign→execute fl
 human `syncProposals()` + `signProposal(id)` on their device → once `status==='ready'`,
 `executeProposal(id)` combines signatures + the Guardian ack and submits on-chain.
 
+## Browser path — protected bets (`web/app/src/cosign.ts`)
+The dapp performs the **same** propose → sign(agent) → sign(human) → execute
+ceremony **live in the browser** when a user places a *protected* bet. Each user
+gets their own cached 2-of-N Guardian betting account. Two things were required to
+make 2-of-2 actually reach threshold on-chain:
+
+1. **Distinct cosigner keys.** `AuthSecretKey.rpoFalconWithRNG(null)` seeds from a
+   default and returns the **same** key every call. Seed both signers from a CSPRNG
+   (`rpoFalconWithRNG(randSeed())`) so the agent and human commitments differ.
+2. **A separate `MultisigClient` per cosigner.** `load(account, signer)` calls
+   `guardianClient.setSigner(signer)` on a **shared** client, and the returned
+   `Multisig` keeps that client — so loading both signers on one client made
+   Guardian attribute both signatures to whichever loaded last (`409
+   proposal_already_signed`, stuck at "1 of 2"). Give the agent and human their own
+   `MultisigClient` (`clientA` / `clientH`) so their Guardian auth is independent.
+
+A self-heal check plus an identity-version bump (`subrosa.guardian.identity.vN` in
+localStorage) abandons any account created by an earlier broken build.
+
 ## Status / what's verified
-- ✅ Design + API grounded in the repo; `agent/` written to the verified surface.
-- ⚠️ End-to-end (live Guardian server + a human co-signer + on-chain finalize) is
-  not yet exercised here — it needs the docker server up and a second signer.
-- ⚠️ `FalconSigner` / `AuthSecretKey.rpoFalconWithRNG(...)` exact constructor is
-  UNVERIFIED (from the repo sketch) — confirm at first run.
+- ✅ Design + API grounded in the repo; `agent/` and `web/app/src/cosign.ts` written
+  to the verified surface.
+- ✅ End-to-end browser co-sign exercised live: create/register 2-of-N → collect
+  both signatures → `executeProposal` submits on-chain (per-cosigner-client fix,
+  commit `b45d8ec`).
+- ✅ `FalconSigner` / `AuthSecretKey.rpoFalconWithRNG(seed)` confirmed — **must** be
+  given a CSPRNG seed (a `null`/`undefined` seed returns identical keys).
 - Guardian is WIP; keep the dependency thin and re-verify on SDK bumps.
 
 ## Backup/recovery (optional, secondary)

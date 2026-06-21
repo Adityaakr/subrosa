@@ -137,7 +137,9 @@ flowchart LR
 
 The agent trades from its **own private account**, so its strategy and book stay hidden — an edge that can't be copied. Miden has no native *size-conditional* multisig, so the cap is enforced app-side: **at/below cap → the agent acts alone; above cap → it must get a human co-signature**, coordinated by Guardian. The loop ships with real safety rails (budget, max-trades, kill-switch file, error backoff, stand-down on resolution).
 
-### 4 · Guardian co-sign (Approvals)
+### 4 · Guardian co-sign (protected bets)
+
+When you place a **protected** bet, the dapp runs a real, live **2-of-N + Guardian** ceremony on Miden testnet before sealing the position — not a mock. Each user gets their own **Guardian betting account** (a 2-of-N multisig: an agent key + a human key, both held client-side; threshold 2 with Guardian enabled), created once and cached in the browser.
 
 ```mermaid
 ---
@@ -146,21 +148,23 @@ config:
   theme: neutral
 ---
 sequenceDiagram
-  participant Ag as Agent
-  participant UI as Approvals (dapp)
-  participant Hu as Human
+  participant UI as dapp (cosign.ts)
+  participant Ms as 2-of-N Guardian account
   participant G as Guardian server
   participant Ch as Miden chain
 
-  Ag->>UI: wants to deploy above its cap
-  UI->>Hu: pending 2-of-N request
-  Hu->>G: Co-sign (agent + human signatures)
-  G->>G: verify deltas against chain
-  G->>Ch: execute co-signed multisig tx
-  Ch-->>UI: GUARDIAN VERIFIED ✓
+  UI->>Ms: load/create account (register on Guardian)
+  UI->>G: propose co-sign  (agent client)
+  UI->>G: sign as agent     (agent client)
+  UI->>G: sign as human     (human client)
+  G->>G: collect 2 of 2 signatures
+  UI->>Ch: executeProposal (co-signed on-chain)
+  Ch-->>UI: Guardian co-signed ✓
 ```
 
-Guardian is **non-custodial** — it coordinates and acknowledges, it never holds a spending key. It's a resilience/coordination layer, self-hosted so private payloads never leave infrastructure you control.
+**Each cosigner uses its own `MultisigClient`.** `MultisigClient.load(account, signer)` calls `guardianClient.setSigner(signer)` on a *shared* client, so loading both signers on one client made Guardian attribute both signatures to whichever signer loaded last (`409 already_signed`, stuck at "1 of 2"). Giving the agent and human **separate clients** makes their Guardian auth independent, so both signatures register and `executeProposal` reaches threshold. The two cosigner keys are also seeded from a CSPRNG (`rpoFalconWithRNG(randSeed())`) so they're genuinely distinct, with a self-heal + identity-version bump that abandons any earlier broken account.
+
+Guardian is **non-custodial** — it coordinates and acknowledges, it never holds a spending key. It's a resilience/coordination layer, self-hosted so private payloads never leave infrastructure you control. (The agent's *above-cap* trading path uses the same primitive server-side.)
 
 ---
 
