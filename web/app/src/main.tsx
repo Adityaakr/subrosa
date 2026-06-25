@@ -5,6 +5,7 @@ import { WalletProvider } from "@miden-sdk/miden-wallet-adapter-react";
 import { MidenWalletAdapter } from "@miden-sdk/miden-wallet-adapter-miden";
 import { WalletAdapterNetwork } from "@miden-sdk/miden-wallet-adapter-base";
 import { MIDEN_RPC_URL, MIDEN_PROVER, APP_NAME } from "./config";
+import { resetStaleNetworkState } from "./reset-stale-db";
 import "./proto/proto.css";
 
 // Provide the wallet-adapter CONTEXT (so the Miden Wallet option works) WITHOUT
@@ -30,23 +31,30 @@ import App from "./proto/app.tsx";
 // We sync explicitly inside the flows instead.
 const midenConfig = { rpcUrl: MIDEN_RPC_URL, prover: MIDEN_PROVER, autoSyncInterval: 0 };
 
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <WalletProvider wallets={walletAdapters} network={WalletAdapterNetwork.Testnet} autoConnect={false}>
-      <MidenProvider
-        config={midenConfig}
-        loadingComponent={
-          <div className="backdrop" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh" }}>
-            <div style={{ textAlign: "center" }}>
-              <img src="/logo/subrosa-mark.svg" width={46} height={46} style={{ borderRadius: 11 }} alt="Subrosa" />
-              <div className="mono" style={{ marginTop: 14, fontSize: 11.5, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--faint)" }}>Loading Subrosa — initialising client…</div>
+// CRITICAL: purge any 0.14-genesis IndexedDB BEFORE MidenProvider mounts and
+// opens MidenClientDB_mtst. Stale accounts/notes from the pre-reset testnet make
+// the 0.15 node reject our version and the prover reject the old account-ID
+// encoding ("`0` is not a known account ID version"). The wipe runs once per
+// network epoch, then renders regardless of outcome.
+resetStaleNetworkState().finally(() => {
+  createRoot(document.getElementById("root")!).render(
+    <StrictMode>
+      <WalletProvider wallets={walletAdapters} network={WalletAdapterNetwork.Testnet} autoConnect={false}>
+        <MidenProvider
+          config={midenConfig}
+          loadingComponent={
+            <div className="backdrop" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh" }}>
+              <div style={{ textAlign: "center" }}>
+                <img src="/logo/subrosa-mark.svg" width={46} height={46} style={{ borderRadius: 11 }} alt="Subrosa" />
+                <div className="mono" style={{ marginTop: 14, fontSize: 11.5, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--faint)" }}>Loading Subrosa — initialising client…</div>
+              </div>
             </div>
-          </div>
-        }
-      >
-        <div className="backdrop" />
-        <App />
-      </MidenProvider>
-    </WalletProvider>
-  </StrictMode>,
-);
+          }
+        >
+          <div className="backdrop" />
+          <App />
+        </MidenProvider>
+      </WalletProvider>
+    </StrictMode>,
+  );
+});
