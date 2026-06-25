@@ -178,7 +178,20 @@ function useWallet() {
   const { accounts, wallets, isLoading: listLoading } = useAccounts();
   const { consume } = useConsume();
   const { sync } = useSyncState();
+  const { isReady: midenReady } = useMiden();
   const notes = useNotes();
+  // The Miden WASM client initialises asynchronously (module load + first sync).
+  // The SDK throws "Miden client is not ready" if a mutation fires before that
+  // finishes — easy to hit on a cold load, especially right after the one-time
+  // 0.15 IndexedDB wipe. Track readiness in a ref so async handlers see the live
+  // value, and WAIT for it instead of failing the click.
+  const readyRef = React.useRef(false);
+  React.useEffect(() => { readyRef.current = midenReady; }, [midenReady]);
+  const waitForReady = async (ms = 40000) => {
+    const deadline = Date.now() + ms;
+    while (!readyRef.current && Date.now() < deadline) await new Promise((r) => setTimeout(r, 200));
+    if (!readyRef.current) throw new Error("Miden client is still initialising — give it a few seconds and try again.");
+  };
   const notesRef = React.useRef([]);
   // consumableNoteSummaries carry a string `id` that consume() accepts (the raw
   // ConsumableNoteRecord objects are NOT a valid consume input).
@@ -255,6 +268,7 @@ function useWallet() {
     if (account) return account;
     setConnecting(true);
     try {
+      await waitForReady();
       // Recover the PERSISTED wallet first. The store hydrates asynchronously,
       // so wait for it before concluding the wallet is gone — creating a fresh
       // wallet here just because the list hadn't loaded was the "my wallet keeps
@@ -330,6 +344,8 @@ function useWallet() {
     if (!id || funding) return;
     setFunding(true); setError(null);
     try {
+      setFundMsg("Waiting for the Miden client…");
+      await waitForReady();
       let fid = await ensureFaucet();
       setFundMsg("Minting 1,000 OBX…");
       // mintWithRetry handles both a stale faucet (rebuild) and a transient proof

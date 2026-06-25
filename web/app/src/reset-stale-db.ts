@@ -66,13 +66,17 @@ export async function resetStaleNetworkState(): Promise<void> {
 
   for (const n of names) await deleteDb(n);
 
-  // Drop any 0.14-genesis Guardian betting identity (every version key) — those
-  // multisig accounts don't exist on the reset network.
+  // Drop EVERY cached account reference (wallet id, test faucet id, positions,
+  // co-sign ids, Guardian identities). All of them point at accounts/notes that
+  // lived in the IndexedDB we just deleted — keeping a stale `subrosa.wallet.id`
+  // makes the dapp show a phantom 0-OBX wallet whose account no longer exists,
+  // so funding/placing target a missing account. Clear all `subrosa.*` keys
+  // except our own epoch marker so the reset network starts from a clean slate.
   try {
     const stale: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
-      if (k && k.startsWith(GUARDIAN_LS_PREFIX)) stale.push(k);
+      if (k && k !== EPOCH_LS && (k.startsWith("subrosa.") || k.startsWith(GUARDIAN_LS_PREFIX))) stale.push(k);
     }
     for (const k of stale) localStorage.removeItem(k);
   } catch {
