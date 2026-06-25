@@ -22,6 +22,79 @@ const POS_LS_PREFIX = "subrosa.pos.";
 // made automatically — no manual storage clearing needed.
 const FAUCET_LS = "subrosa.faucet.v2.id";
 const FUND_DECIMALS = 8;
+// Falcon (RpoFalcon512) auth scheme, as the WASM `newWallet`/`newFaucet` numeric
+// discriminant (= 2). We MUST pass this explicitly: @miden-sdk/react@0.15.2
+// defaults to `AuthScheme.AuthRpoFalcon512`, but the 0.15.2 WASM renamed that
+// enum member to `AuthScheme.Falcon` (a STRING "falcon"), so the SDK default
+// resolves to `undefined` → `newWallet` throws "invalid enum value passed" and
+// the promise hangs. The numeric form is what the WASM actually accepts.
+const FALCON_AUTH_SCHEME = 2;
+
+// ── Serialize ALL Miden client access through one mutex ──────────────────────
+// The 0.15 single-threaded WASM client keeps its state in a RefCell and PANICS
+// ("RefCell already borrowed" → unreachable, which permanently poisons the
+// instance) if two async client calls execute concurrently. @miden-sdk/react's
+// mutation hooks take an internal lock, but its QUERY hooks (useAccount/
+// useAccounts/useNotes) call `client.getAccount()/getAccounts()` with NO lock —
+// so a balance refetch that overlaps a mint/createFaucet kills the client. We
+// fix this at the source: wrap every async client method in one shared lock so
+// reads and writes can never run at the same time. wasm-bindgen method shims are
+// leaf calls (they don't re-enter each other in JS), so a single lock can't
+// deadlock. Idempotent — patches a given client instance once.
+const _clientChain = new WeakMap(); // client -> tail promise
+function serializeMidenClient(client) {
+  if (!client || client.__subrosaSerialized) return client;
+  // ONLY async (Promise-returning) methods may be wrapped. Synchronous request
+  // builders like newConsumeTransactionRequest() return a TransactionRequest
+  // object — wrapping them in a promise chain would break `.serialize()` on the
+  // result. Sync methods also can't cause the cross-await borrow race, so they
+  // never need serializing. This list is reads + the heavy account/tx mutations.
+  // The LEAF async (Promise-returning) WebClient methods — every single-call WASM
+  // export, taken straight from the SDK's crate typings. We deliberately wrap
+  // ONLY leaf methods: the high-level JS composites (`syncState` → `syncStateImpl`,
+  // `sync` → syncState/syncChain/…) call these internally, so wrapping BOTH the
+  // composite and its leaves makes the inner call queue behind the outer in the
+  // same lock → re-entrant DEADLOCK (funding silently hangs). Leaving the
+  // composites unwrapped is correct: the actual RefCell borrow happens in the
+  // leaf (e.g. syncStateImpl), which IS serialized. Synchronous request builders
+  // (newConsumeTransactionRequest…) and factories (createClient*) are excluded —
+  // wrapping a sync method would turn its result into a Promise.
+  const methods = [
+    // reads (the unlocked racing party — every account/note reader the hooks touch)
+    "getAccount", "getAccounts", "getAccountStorage", "getAccountVault",
+    "getAccountCode", "accountReader", "getAccountAuthByPubKeyCommitment",
+    "getAccountByKeyCommitment", "getPublicKeyCommitmentsOfAccount",
+    "getConsumableNotes", "getInputNotes", "getInputNote", "getOutputNotes",
+    "getOutputNote", "fetchPrivateNotes", "fetchAllPrivateNotes",
+    "getTransactions", "getSyncHeight", "getSetting", "listSettingKeys", "listTags",
+    // sync — LEAF impls only (NOT the syncState/sync/syncChain composites)
+    "syncStateImpl", "syncChainImpl", "syncNoteTransportImpl",
+    // account + tx mutations / proving / submit (single-call WASM exports = leaf)
+    "newWallet", "newFaucet", "newAccount", "newAccountWithSecretKey",
+    "importAccountById", "importAccountFile", "importPublicAccountFromSeed",
+    "applyTransaction", "executeTransaction", "executeForSummary", "executeProgram",
+    "proveTransaction", "proveBlock", "sendPrivateNote",
+    "submitNewTransaction", "submitNewTransactionWithProver", "submitProvenTransaction",
+    // async request builders (return Promise<TransactionRequest>) + store writes
+    "newMintTransactionRequest", "newSendTransactionRequest", "newSwapTransactionRequest",
+    "addAccountSecretKeyToWebStore", "addTag", "removeTag", "insertAccountAddress",
+    "removeAccountAddress", "setSetting", "removeSetting", "pruneAccountHistory",
+  ];
+  _clientChain.set(client, Promise.resolve());
+  for (const name of methods) {
+    const orig = client[name];
+    if (typeof orig !== "function") continue;
+    client[name] = function (...args) {
+      const prev = _clientChain.get(client) || Promise.resolve();
+      const run = prev.then(() => orig.apply(this, args), () => orig.apply(this, args));
+      // keep the chain alive regardless of this call's outcome
+      _clientChain.set(client, run.then(() => {}, () => {}));
+      return run;
+    };
+  }
+  try { Object.defineProperty(client, "__subrosaSerialized", { value: true }); } catch (e) { client.__subrosaSerialized = true; }
+  return client;
+}
 
 // Guardian co-sign creates 2-of-N MULTISIG accounts in the SAME IndexedDB the
 // built-in wallet uses. We record their ids so the wallet never adopts one as
@@ -192,7 +265,7 @@ function useWallet() {
         for (let i = 0; i < 30 && loadingRef.current; i++) await new Promise((r) => setTimeout(r, 150));
         w = listRef.current.find((a) => sameId(a, walletId)) || null;
       }
-      if (!w) w = await createWallet({ storageMode: "private" });
+      if (!w) w = await createWallet({ storageMode: "private", authScheme: FALCON_AUTH_SCHEME });
       acctRef.current = w;
       try { localStorage.setItem(WALLET_LS, idOf(w)); } catch (e) {}
       setWalletId(idOf(w));
@@ -214,7 +287,7 @@ function useWallet() {
   const ensureFaucet = async (force = false) => {
     if (!force && faucetId && list.find((a) => sameId(a, faucetId))) return faucetId;
     setFundMsg(force ? "Refreshing test faucet…" : "Creating test faucet…");
-    const f = await wasmRetry(() => createFaucet({ tokenSymbol: "OBX", decimals: FUND_DECIMALS, maxSupply: 10_000_000_000_000_000n, storageMode: "public" }));
+    const f = await wasmRetry(() => createFaucet({ tokenSymbol: "OBX", decimals: FUND_DECIMALS, maxSupply: 10_000_000_000_000_000n, storageMode: "public", authScheme: FALCON_AUTH_SCHEME }));
     const fid = idOf(f);
     try { localStorage.setItem(FAUCET_LS, fid); } catch (e) {}
     setFaucetId(fid);
@@ -397,7 +470,7 @@ function useMidenFi() {
 
 /* Reads every registered live market's on-chain state on an interval (serially,
    to respect the single WASM client) → { [marketId]: {yesPct, volume, ...} }. */
-function useLiveMarkets(client, isReady, pausedRef) {
+function useLiveMarkets(client, isReady, pausedRef, runExclusive) {
   const [live, setLive] = React.useState({});
   React.useEffect(() => {
     if (!isReady || !client) return;
@@ -411,7 +484,14 @@ function useLiveMarkets(client, isReady, pausedRef) {
         const out = {};
         for (const [mid, acctHex] of Object.entries(LIVE_MARKETS)) {
           if (!acctHex) continue;
-          try { out[mid] = await readMarketState(client, acctHex); } catch (e) {}
+          // Run each read through the SDK's shared client lock. The 0.15
+          // single-threaded WASM client PANICS ("RefCell already borrowed" →
+          // unreachable, poisoning the instance) on a concurrent borrow — it no
+          // longer throws the retryable "recursive use" string 0.14 did. A read
+          // that races a mint/consume/place would therefore kill the client, so
+          // we serialize reads against mutations instead of relying on the
+          // best-effort pausedRef (which can't stop a tick already in flight).
+          try { out[mid] = await runExclusive(() => readMarketState(client, acctHex)); } catch (e) {}
         }
         if (alive && Object.keys(out).length) setLive((prev) => ({ ...prev, ...out }));
       } finally { inflight = false; }
@@ -441,10 +521,16 @@ function App() {
   const builtin = useWallet();
   const mf = useMidenFi();
   const { execute } = useTransaction();
-  const { client, isReady } = useMiden();
+  const { client, isReady, runExclusive } = useMiden();
+
+  // Serialize every client call the moment the client exists — BEFORE any query
+  // hook or mutation can touch it — so the single-threaded 0.15 WASM never sees a
+  // concurrent borrow (which would panic + poison it). See serializeMidenClient.
+  React.useMemo(() => { if (client) serializeMidenClient(client); }, [client]);
 
   // Expose a live market reader (used by the headless read-test; also the basis
-  // for the live-odds UI wiring in the next step).
+  // for the live-odds UI wiring in the next step). Reads go through the same
+  // serialized client, so they can't race a mutation.
   React.useEffect(() => {
     if (isReady && client) window.__subrosaReadMarket = (hex) => readMarketState(client, hex || MARKET_ID_HEX);
   }, [isReady, client]);
@@ -457,7 +543,7 @@ function App() {
   // without restarting its interval.
   const walletBusyRef = React.useRef(false);
   walletBusyRef.current = !!coSignStep || !!seal || builtin.funding || mfFunding;
-  const live = useLiveMarkets(client, isReady, walletBusyRef);
+  const live = useLiveMarkets(client, isReady, walletBusyRef, runExclusive);
   React.useEffect(() => { window.__subrosaLive = live; }, [live]);
 
   // Fund the EXTERNAL MidenFi wallet: our web client mints a public OBX note to
