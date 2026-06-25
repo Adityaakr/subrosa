@@ -7,6 +7,9 @@
 #
 # Setup (one time):
 #   git clone https://github.com/OpenZeppelin/guardian ../guardian
+#   git -C ../guardian checkout v0.15.0    # MUST match the testnet's Miden 0.15;
+#                                          # 0.14.x rejects 0.15 accounts with a 502
+#                                          # "`1` is not a known account ID version"
 #   GUARDIAN_REPO=../guardian docker compose -f docker/guardian-compose.yml up --build -d
 #
 # The upstream repo also ships its own docker-compose.yml; this wrapper just

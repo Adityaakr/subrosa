@@ -41,6 +41,13 @@ Deploy the upstream **[OpenZeppelin/guardian](https://github.com/OpenZeppelin/gu
 as its own Railway service (point a service at that repo, or its Docker image).
 Build it with the postgres feature: `GUARDIAN_SERVER_FEATURES=postgres`.
 
+> **Pin Guardian to `v0.15.0` or newer.** The server must run the **Miden 0.15**
+> libraries to match the testnet (and the `@openzeppelin/miden-multisig-client@^0.15`
+> the dapp uses). An older Guardian (0.14.x) rejects every 0.15 account at
+> `registerOnGuardian` with a `502`:
+> `Failed to validate credential: … invalid value: \`1\` is not a known account ID version`.
+> Deploy the `v0.15.0` git tag and redeploy whenever the testnet/SDK major moves.
+
 **Variables:**
 
 | Var | Required | Value |
