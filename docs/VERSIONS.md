@@ -3,6 +3,28 @@
 > Spec rule 2: record exact installed versions; do not silently upgrade mid-build.
 > Recorded 2026-06-16.
 
+## 0.15 testnet migration — known gaps (2026-06-25)
+
+The testnet reset to **Miden 0.15**. The web client/SDK were upgraded to `0.15.2`
+and funding works. Two things are blocked on factors outside this repo:
+
+- **Placing positions — contract packages.** The 0.15 client requires package
+  format **v3**; our compiled `place_note.masp` / `market.masp` are **v2**
+  (`"Got [0,0,2], only [0,0,3] supported"`). The published contract compiler
+  (`cargo-miden 0.8.1`, `miden-mast-package 0.22`) only emits v2; the only v3
+  source is the compiler's unreleased `next` branch (`miden-mast-package 0.23`),
+  which currently fails packaging with an internal MAST serialization error
+  (`UntrustedMastForest expected HASHLESS/STRIPPED`). **No working toolchain
+  emits v3 yet.** Interim: `place()` stakes OBX into a private **P2ID own-output
+  note** (`NoteScript.p2id()` + `withOwnOutputNotes`, no note transport, no
+  custom `.masp`) — a real private on-chain commitment. The market-procedure call
+  that moves public odds is deferred until the v3 toolchain + redeployed market
+  accounts land (restore the `place_note.masp` build at `web/app/src/proto/app.tsx`).
+- **Guardian co-sign.** Requires the self-hosted Guardian server at **v0.15.0**
+  (Miden 0.15). A 0.14 server 502s with `` `1` is not a known account ID version``.
+  Co-sign now fails gracefully (places directly) until the Railway Guardian is
+  redeployed at `v0.15.0`.
+
 ## Host toolchain (verified locally)
 
 | Tool | Version | Notes |

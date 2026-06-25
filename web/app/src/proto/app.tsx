@@ -807,32 +807,32 @@ function App() {
       try {
         const acct = await builtin.connect();
         const signerRef = acct.id();
-        const senderId = acct.id();
-        // Target the viewed market's real on-chain account when it's live;
-        // otherwise the default market. Record it so the position is tied to a
-        // real market (and can be redeemed there if it resolves).
         const marketHex = (order.market && LIVE_MARKETS[order.market.id]) || MARKET_ID_HEX;
-        const masp = order.side === "YES" ? "/packages/place_note.masp" : "/packages/place_no_note.masp";
-        const buf = await fetch(masp).then((r) => r.arrayBuffer());
-        const ns = NoteScript.fromPackage(Package.deserialize(new Uint8Array(buf)));
-        const mid = AccountId.fromHex(marketHex);
         const faucetHex = (() => { try { return localStorage.getItem(FAUCET_LS); } catch (e) { return null; } })();
+        if (!faucetHex || !(order.amount > 0)) throw new Error("Fund your wallet with OBX before placing a position.");
 
-        // STAKE the bet in OBX (the private note carries `amount` of your OBX, so
-        // placing debits your balance). Build + submit with a retry — a protected
-        // bet's co-sign uses a second client, and a transient WASM/RPC hiccup can
-        // fail the first submit; rebuild the note fresh each attempt.
+        // ── 0.15 position note (degraded path — see docs/VERSIONS.md) ──────────
+        // The custom place_note.masp is package format v2, which the 0.15 client
+        // rejects ("Got [0,0,2], only [0,0,3] supported"), and the market accounts
+        // are 0.14-format — both dead on the reset 0.15 network and blocked upstream
+        // (no working v3 contract toolchain yet). Until that lands we stake `amount`
+        // OBX into a private note built from the SDK's well-known P2ID script
+        // (NoteScript.p2id()) instead of the custom market note, emitted as an OWN
+        // OUTPUT note (withOwnOutputNotes) so it's tracked locally with NO note
+        // transport — the same reason funding's own notes work on 0.15 (a `send()`
+        // P2P private note fails: "note transport is disabled"). This is a genuine
+        // on-chain private commitment (the chain sees only the note's hash); what's
+        // deferred is the market-procedure call that moves public odds. When v3
+        // ships, restore the place_note.masp + NoteTag.withAccountTarget(market).
+        const ns = NoteScript.p2id();
         let res, noteId;
         for (let attempt = 1; attempt <= 3; attempt++) {
           try {
-            let assets;
-            try {
-              assets = (faucetHex && order.amount > 0)
-                ? new NoteAssets([new FungibleAsset(toAccountId(faucetHex), parseAssetAmount(String(order.amount), FUND_DECIMALS))])
-                : new NoteAssets();
-            } catch (e) { assets = new NoteAssets(); }
+            const assets = new NoteAssets([new FungibleAsset(toAccountId(faucetHex), parseAssetAmount(String(order.amount), FUND_DECIMALS))]);
             const rec = new NoteRecipient(randomWord(), ns, new NoteStorage(new FeltArray()));
-            const meta = new NoteMetadata(senderId, NoteType.Private, NoteTag.withAccountTarget(mid));
+            // Tag the note to your OWN account (a valid 0.15 id) — the dead 0.14
+            // market id would throw at AccountId parsing.
+            const meta = new NoteMetadata(signerRef, NoteType.Private, NoteTag.withAccountTarget(signerRef));
             const note = new Note(assets, meta, rec);
             noteId = (() => { try { return note.id().toString(); } catch (e) { return null; } })();
             const req = new TransactionRequestBuilder().withOwnOutputNotes(new NoteArray([note])).build();
