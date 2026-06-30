@@ -658,7 +658,40 @@ function App() {
     tx: rt?.tx, noteId: rt?.noteId, account: rt?.account, coSignMultisig: rt?.coSignMultisig,
     viaMidenFi: !!rt?.viaMidenFi, revealed: false, confirmed: !!confirmed,
   });
-  const upsertPosition = (pos) => setPositions((ps) => ps.some((p) => p.id === pos.id) ? ps.map((p) => p.id === pos.id ? { ...p, ...pos } : p) : [pos, ...ps]);
+  const upsertPosition = (pos) => setPositions((ps) => {
+    // Look for an existing position with the same marketId AND side
+    const existingIndex = ps.findIndex(
+      (p) => p.marketId === pos.marketId && p.side === pos.side
+    );
+    
+    if (existingIndex >= 0) {
+      // Position exists for this market+side — merge by summing amounts
+      return ps.map((p, i) => 
+        i === existingIndex 
+          ? {
+              ...p,
+              size: p.size + pos.size,                    // Sum the stake amounts
+              shares: p.shares + pos.shares,              // Sum the shares
+              value: p.value + pos.value,                 // Sum the values
+              // Weighted average price based on new shares allocation
+              avg: Math.round((p.avg * p.shares + pos.avg * pos.shares) / (p.shares + pos.shares)),
+              // Keep the first position's id, tx, noteId for history
+              // But update metadata from the new transaction
+              commitment: pos.commitment,
+              tx: pos.tx,
+              noteId: pos.noteId,
+              account: pos.account,
+              coSignMultisig: pos.coSignMultisig,
+              viaMidenFi: pos.viaMidenFi,
+              confirmed: pos.confirmed,
+            }
+          : p
+      );
+    }
+    
+    // No existing position for this market+side — add as new
+    return [pos, ...ps];
+  });
 
   const go = (r) => { if (r !== "detail") setMarket(null); setRoute(r); };
   const openMarket = (m) => { setMarket(m); setRoute("detail"); };
