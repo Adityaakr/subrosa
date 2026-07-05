@@ -165,9 +165,9 @@ function Sidebar({ route, go, positionsCount, approvalsCount }) {
         <div style={{ padding: 12, borderRadius: "var(--r-md)", border: "1px solid var(--hair)", background: "var(--surface-2)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 7 }}>
             <window.Icon name="shield-check" size={14} color="var(--accent)" />
-            <span className="tag" style={{ color: "var(--text)" }}>PRIVACY ON</span>
+            <span className="tag" style={{ color: "var(--text)" }}>MIDEN EXECUTION</span>
           </div>
-          <p style={{ margin: 0, fontSize: 11.5, lineHeight: 1.45, color: "var(--faint)" }}>Positions held in your private account. Chain sees commitments only.</p>
+          <p style={{ margin: 0, fontSize: 11.5, lineHeight: 1.45, color: "var(--faint)" }}>Collateral and settlement stay on Miden. Beta execution notes are public.</p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 7, padding: "0 4px" }}>
           <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--yes)", boxShadow: "0 0 8px var(--yes)" }} />

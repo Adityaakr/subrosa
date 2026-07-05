@@ -15,19 +15,22 @@
 
   const markets = [
     {
-      id: "eth-4k", category: "Crypto", question: "Will ETH close above $4,000 on Jul 31?",
-      yes: 63, volume: "$412k", liquidity: "$128k", closes: "Jul 31, 2026", closesIn: "45d",
-      oracle: "Pragma", traders: 1840, change: +2.4,
+      id: "miden-mainnet", category: "Sports", question: "Will Morocco win the 2026 FIFA World Cup?",
+      yes: 42, volume: "0 OBX", liquidity: "0 OBX", closes: "Jul 20, 2026", closesIn: "15d",
+      oracle: "Polymarket / UMA", traders: 0, change: 0,
+      polymarketSlug: import.meta.env.VITE_POLYMARKET_SLUG || "will-morocco-win-the-2026-fifa-world-cup-464",
     },
     {
-      id: "miden-mainnet", category: "Infra", question: "Will Miden mainnet launch before Aug 1?",
-      yes: 71, volume: "$126k", liquidity: "$64k", closes: "Aug 1, 2026", closesIn: "47d",
-      oracle: "Optimistic", traders: 612, change: +5.1,
+      id: "eth-4k", category: "Crypto", question: "Will Ethereum reach $2,000 in July?",
+      yes: 33.5, volume: "0 OBX", liquidity: "0 OBX", closes: "Aug 1, 2026", closesIn: "26d",
+      oracle: "Polymarket / UMA", traders: 0, change: 0,
+      polymarketSlug: "will-ethereum-reach-2000-in-july-2026",
     },
     {
-      id: "fed-sep", category: "Macro", question: "Will the Fed cut rates in September?",
-      yes: 45, volume: "$908k", liquidity: "$240k", closes: "Sep 17, 2026", closesIn: "93d",
-      oracle: "Pragma", traders: 4210, change: -1.8, noFavored: true,
+      id: "fed-sep", category: "Macro", question: "Fed rate cut by September 2026 meeting?",
+      yes: 5.1, volume: "0 OBX", liquidity: "0 OBX", closes: "Sep 16, 2026", closesIn: "73d",
+      oracle: "Polymarket / UMA", traders: 0, change: 0, noFavored: true,
+      polymarketSlug: "fed-rate-cut-by-september-2026-meeting-264-382",
     },
   ];
   markets.forEach((m) => { m.history = series(m.yes, 40, 3.2); });

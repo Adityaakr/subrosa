@@ -77,16 +77,21 @@ flowchart TB
 
 **Four layers:**
 
-1. **Frontend** (`web/app`) — a React dapp that runs the **Miden WASM client in the browser**: it builds, executes, and STARK-proves transactions locally, then submits the proof. Nothing about your position leaves your machine in the clear.
-2. **Contracts** (`contracts/`) — the `market` **account component** (public reserves + CPMM odds) and **private position notes** with an on-chain redemption guard.
+1. **Frontend** (`web/app`) — a React dapp that runs the **Miden WASM client in the browser**: it builds, executes, and STARK-proves transactions locally, then submits the proof.
+2. **Contracts** (`contracts/`) — the `market` **account component** (public reserves + CPMM odds), collateralized execution notes, and an on-chain redemption guard.
 3. **Confidential agent** (`agent/`) — an autonomous trader with an LLM brain and a programmable-auth risk cap.
 4. **Guardian** (OpenZeppelin) — a self-hosted 2-of-N co-sign coordinator for trades above the agent's cap.
+
+Polymarket can be used as an external catalogue, price benchmark and resolution
+reference while execution stays on Miden. The current beta uses discoverable
+public execution notes, so amount and script are not private. Its exact trust
+boundary is documented in [`docs/POLYMARKET.md`](./docs/POLYMARKET.md).
 
 ---
 
 ## How it works
 
-### 1 · Placing a private position
+### 1 · Placing a mirrored position
 
 ```mermaid
 ---
@@ -98,23 +103,30 @@ sequenceDiagram
   actor U as You
   participant App as Dapp (browser)
   participant W as Wallet + Prover (WASM)
+  participant O as Market operator
   participant M as Market account (public)
   participant Ch as Miden chain
 
   U->>App: pick side + size
-  App->>W: build position note, stake OBX
+  App->>W: build public execution note, lock OBX
   W->>W: execute + STARK-prove locally
-  W->>Ch: submit proof only
-  Ch->>M: reserves move → public odds shift
-  Ch-->>App: note commitment = your private position
-  Note over U,Ch: Chain sees a commitment + new odds —<br/>never your side, size, or identity.
+  W->>Ch: submit note transaction
+  O->>Ch: consume allowlisted note
+  Ch->>M: deposit collateral + move reserves
+  Note over U,Ch: Current beta execution is public.<br/>Settlement and collateral stay on Miden.
 ```
 
-Your stake collateralizes the bet (balance actually drops), the market's public reserves move (so the odds are real), and you receive a **private note** whose commitment is all the chain stores. The dapp shows you both hashes: the public **transaction** and your private **position commitment**.
+The contract derives stake size from the note's single fungible asset, deposits
+that asset into the market vault, and updates reserves atomically. It never
+trusts a caller-supplied amount. The dapp stores a local wallet-side position
+record and shows the note and transaction identifiers.
 
 ### 2 · Resolution & redemption
 
-The market account has a one-shot `resolve(outcome)` written by a designated resolver key. Settlement is **trustless on-chain**: a position note calls `redeem(outcome, shares)`, which **asserts the market is resolved AND your side won** — losing or invalid notes simply *abort* the proof. No winner list, no oracle trust in the payout path.
+The market account has a one-shot `resolve(outcome)` written by its authenticated
+operator. The relay only acts after the allowlisted Polymarket condition closes
+at an unambiguous 1/0 outcome. The contract's `redeem` guard rejects unresolved
+and losing claims; production payout-note plumbing remains to be completed.
 
 ### 3 · The confidential agent + programmable-auth cap
 
@@ -174,10 +186,9 @@ Every market is a **public account** — open it on the explorer and verify the 
 
 | Market | Account ID | Explorer |
 | ------ | ---------- | -------- |
-| Will ETH close above $4,000? | `0x612f7f710da01a10116a1ca76afac5` | [view](https://testnet.midenscan.com/account/0x612f7f710da01a10116a1ca76afac5) |
-| Will Miden mainnet launch before Aug 1? | `0x5ff0303f0b795d1039ca5b51d8480b` | [view](https://testnet.midenscan.com/account/0x5ff0303f0b795d1039ca5b51d8480b) |
-| Will the Fed cut rates in September? | `0x7003429f9cdb431056970e854e5ed6` | [view](https://testnet.midenscan.com/account/0x7003429f9cdb431056970e854e5ed6) |
-| OBX test-collateral faucet | `0x1201d9f8819d5220778535e4e2f08a` | [view](https://testnet.midenscan.com/account/0x1201d9f8819d5220778535e4e2f08a) |
+| Will Morocco win the 2026 FIFA World Cup? (Polymarket mirror) | `0xabbba77bce4bc6d1795be21b30fa5e` | [view](https://testnet.midenscan.com/account/0xabbba77bce4bc6d1795be21b30fa5e) |
+| Will Ethereum reach $2,000 in July? (Polymarket mirror) | `0x72d3ac938ff65611194c3e21d118e9` | [view](https://testnet.midenscan.com/account/0x72d3ac938ff65611194c3e21d118e9) |
+| Fed rate cut by September 2026 meeting? (Polymarket mirror) | `0xca646b034eb701311909b674f207ac` | [view](https://testnet.midenscan.com/account/0xca646b034eb701311909b674f207ac) |
 
 ---
 
@@ -185,7 +196,7 @@ Every market is a **public account** — open it on the explorer and verify the 
 
 | Layer | Stack |
 | ----- | ----- |
-| **Contracts** | Rust + Miden SDK 0.12 → `cargo miden build` → MASM `.masp` |
+| **Contracts** | Rust + Miden SDK 0.13 → `cargo miden build` → MASM `.masp` |
 | **Chain ops** | `miden-client` 0.14 (account creation, prove, submit) |
 | **Frontend** | React 19 · Vite · `@miden-sdk/react` + `@miden-sdk/miden-sdk` 0.14.11 · in-browser WASM proving |
 | **Wallets** | built-in web-SDK wallet · MidenFi browser extension (wallet-adapter) |

@@ -68,6 +68,7 @@ function RedactField({ label, value, sealing, revealed }) {
 }
 
 function PrivacySeal({ order, publicYes, realTx, onView, onClose }) {
+  const publicExecution = !!order.market?._polymarket;
   // phases: review -> sealing -> committing -> done
   const [phase, setPhase] = sS("review");
   const sealing = phase === "sealing" || phase === "committing" || phase === "done";
@@ -80,7 +81,12 @@ function PrivacySeal({ order, publicYes, realTx, onView, onClose }) {
 
   const [oddsTick] = window.useLiveOdds(publicYes, 0.3, 1500);
 
-  const status = { review: "Preparing position…", sealing: "Sealing into your private account…", committing: "Writing commitment to Miden…", done: "Position sealed" }[phase];
+  const status = {
+    review: "Preparing position…",
+    sealing: publicExecution ? "Locking collateral in a public note…" : "Sealing into your private account…",
+    committing: "Writing commitment to Miden…",
+    done: publicExecution ? "Position queued" : "Position sealed",
+  }[phase];
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(16,16,18,0.55)", backdropFilter: "blur(8px)", animation: "fadeIn 0.25s ease both" }}>
@@ -131,8 +137,8 @@ function PrivacySeal({ order, publicYes, realTx, onView, onClose }) {
         {/* ticket — YOUR position (revealed to you once sealed) */}
         <div style={{ background: "var(--bg)", border: "1px solid var(--hair-2)", borderRadius: "var(--r-md)", padding: 16 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-            <span className="tag" style={{ color: "var(--faint)" }}>YOUR POSITION · VISIBLE ONLY TO YOU</span>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10, color: "var(--accent)" }}><window.Icon name="eye-off" size={12} color="var(--accent)" /> PRIVATE</span>
+            <span className="tag" style={{ color: "var(--faint)" }}>{publicExecution ? "YOUR POSITION · SAVED IN THIS WALLET" : "YOUR POSITION · VISIBLE ONLY TO YOU"}</span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10, color: "var(--accent)" }}><window.Icon name={publicExecution ? "radio" : "eye-off"} size={12} color="var(--accent)" /> {publicExecution ? "PUBLIC EXECUTION" : "PRIVATE"}</span>
           </div>
           <div style={{ display: "flex", gap: 16, marginBottom: 14 }}>
             <RedactField label="SIDE" value={order.side} sealing={sealing} revealed={phase === "done"} />
@@ -140,7 +146,7 @@ function PrivacySeal({ order, publicYes, realTx, onView, onClose }) {
             <RedactField label="SHARES" value={order.shares.toFixed(1)} sealing={sealing} revealed={phase === "done"} />
           </div>
           <div style={{ borderTop: "1px solid var(--hair)", paddingTop: 12, display: "flex", flexDirection: "column", gap: 9 }}>
-            <HashRow label="Position commitment" priv hint="The on-chain commitment of your private position — reveals nothing about side or size" value={realTx && realTx.noteId} pending={realTx ? "—" : "sealing…"} />
+            <HashRow label={publicExecution ? "Execution note" : "Position commitment"} priv={!publicExecution} hint={publicExecution ? "Public note consumed by the market operator" : "The on-chain commitment of your private position — reveals nothing about side or size"} value={realTx && realTx.noteId} pending={realTx ? "—" : "sealing…"} />
             <HashRow label="Transaction" pub value={realTx && realTx.tx} href={realTx && realTx.tx && /^0x[0-9a-f]+$/i.test(String(realTx.tx)) ? `https://testnet.midenscan.com/tx/${realTx.tx}` : null} pending={realTx ? "—" : "writing on-chain…"} />
             {realTx && realTx.coSignMultisig ? (
               <HashRow label="Guardian co-sign · 2-of-N" pub value={realTx.coSignMultisig} href={`https://testnet.midenscan.com/account/${realTx.coSignMultisig}`} />
@@ -154,7 +160,7 @@ function PrivacySeal({ order, publicYes, realTx, onView, onClose }) {
             <div style={{ display: "flex", alignItems: "flex-start", gap: 9, margin: "16px 0", padding: "12px 14px", borderRadius: "var(--r-md)", background: "var(--accent-dim)", border: "1px solid rgba(255,85,0,0.25)" }}>
               <window.Icon name="shield-check" size={15} color="var(--accent)" style={{ marginTop: 1 }} />
               <span style={{ fontSize: 12.5, lineHeight: 1.5, color: "var(--muted)" }}>
-                <b style={{ color: "var(--text)" }}>Public proof, private position.</b> The transaction above is real and verifiable on the explorer — but it carries <b style={{ color: "var(--text)" }}>only a commitment</b>. Your side, size and identity are never written on-chain.
+                {publicExecution ? <><b style={{ color: "var(--text)" }}>Public execution, Miden settlement.</b> The note exposes its script and collateral amount so the operator can consume it. Your wallet keeps the local position record.</> : <><b style={{ color: "var(--text)" }}>Public proof, private position.</b> The transaction above is real and verifiable on the explorer, but it carries <b style={{ color: "var(--text)" }}>only a commitment</b>. Your side, size and identity are never written on-chain.</>}
               </span>
             </div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 2px 16px" }}>

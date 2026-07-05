@@ -9,8 +9,9 @@ import {
 } from "@miden-sdk/miden-sdk";
 import { randomWord } from "../lib/miden";
 import { guardianCoSign } from "../cosign";
+import { fetchPolymarketMarket } from "../lib/polymarket";
 
-const MARKET_ID_HEX = "0x5ff0303f0b795d1039ca5b51d8480b";
+const MARKET_ID_HEX = "0xabbba77bce4bc6d1795be21b30fa5e";
 const OBX_FAUCET_HEX = "0x1201d9f8819d5220778535e4e2f08a";
 const REDEEM_ENDPOINT = import.meta.env.VITE_REDEEM_ENDPOINT ?? "http://localhost:8788/redeem";
 const WALLET_LS = "subrosa.wallet.id";
@@ -106,23 +107,22 @@ const addCoSignId = (id) => { try { const s = new Set(readCoSignIds()); if (id) 
 const isCoSignId = (id) => { try { return id && readCoSignIds().some((x) => String(x).toLowerCase() === String(id).toLowerCase()); } catch (e) { return false; } };
 
 // Public storage slots exported by the market component (read for live odds).
-const SLOT_YES = "miden_market::market::yes_reserve";
-const SLOT_NO = "miden_market::market::no_reserve";
-const SLOT_VOL = "miden_market::market::total_volume";
-const SLOT_RES = "miden_market::market::resolution";
+const SLOT_YES = "market::market::yes_reserve";
+const SLOT_NO = "market::market::no_reserve";
+const SLOT_VOL = "market::market::total_volume";
+const SLOT_RES = "market::market::resolution";
 
 // Markets backed by a REAL on-chain account (read live). Keyed by the
 // window.OBS market id. Others render as "preview". Markets 2 & 3 are added
 // once their accounts are deployed + seeded.
 const LIVE_MARKETS = {
   "miden-mainnet": MARKET_ID_HEX,
-  "eth-4k": "0x612f7f710da01a10116a1ca76afac5", // seeded 63% YES
-  // Fresh unresolved market, seeded 45% YES (5500/4500). The previous account
-  // (0x60de1a…) had been resolved YES on-chain — wrong for a Sep-dated question.
-  "fed-sep": "0x7003429f9cdb431056970e854e5ed6", // seeded 45% YES, LIVE
+  "eth-4k": "0x72d3ac938ff65611194c3e21d118e9",
+  "fed-sep": "0xca646b034eb701311909b674f207ac",
 };
 
 const wordToBig = (w) => { try { return w ? w.toU64s()[0] : 0n; } catch (e) { return 0n; } };
+const OBX_BASE_UNITS = 100_000_000n;
 const toAccountId = (s) => { try { return String(s).startsWith("0x") ? AccountId.fromHex(s) : AccountId.fromBech32(s); } catch (e) { return AccountId.fromHex(s); } };
 
 // Read a market account's public state straight from the chain: reserves →
@@ -139,13 +139,21 @@ async function readMarketState(client, marketIdHex) {
   if (!acct) throw new Error("market account not found: " + marketIdHex);
   const st = acct.storage();
   const slot = (name) => { try { return st.getItem(name); } catch (e) { return undefined; } };
-  const yes = wordToBig(slot(SLOT_YES));
-  const no = wordToBig(slot(SLOT_NO));
-  const volume = wordToBig(slot(SLOT_VOL));
+  const yesRaw = wordToBig(slot(SLOT_YES));
+  const noRaw = wordToBig(slot(SLOT_NO));
+  const volumeRaw = wordToBig(slot(SLOT_VOL));
   const resolution = Number(wordToBig(slot(SLOT_RES)));
-  const total = yes + no;
-  const yesPct = total > 0n ? Number((no * 10000n) / total) / 100 : 50;
-  return { yes: Number(yes), no: Number(no), volume: Number(volume), resolution, yesPct, liquidity: Number(total) };
+  const totalRaw = yesRaw + noRaw;
+  const yesPct = totalRaw > 0n ? Number((noRaw * 10000n) / totalRaw) / 100 : 50;
+  const asObx = (amount) => Number(amount) / Number(OBX_BASE_UNITS);
+  return {
+    yes: asObx(yesRaw),
+    no: asObx(noRaw),
+    volume: asObx(volumeRaw),
+    resolution,
+    yesPct,
+    liquidity: asObx(totalRaw),
+  };
 }
 
 // The Miden WASM client is single-instance and rejects a call that overlaps an
@@ -168,6 +176,20 @@ async function wasmRetry(fn, tries = 10) {
   throw last;
 }
 const shortHex = (s) => (s && s.length > 14 ? `${s.slice(0, 8)}…${s.slice(-4)}` : s);
+
+const placeScripts = new Map();
+async function loadPlaceScript(side) {
+  const key = side === "YES" ? "place_note" : "place_no_note";
+  if (!placeScripts.has(key)) {
+    placeScripts.set(key, (async () => {
+      const response = await fetch(`/packages/${key}.masp`);
+      if (!response.ok) throw new Error(`Failed to load ${key}.masp`);
+      const pkg = Package.deserialize(new Uint8Array(await response.arrayBuffer()));
+      return NoteScript.fromPackage(pkg);
+    })());
+  }
+  return placeScripts.get(key);
+}
 
 /* Real built-in browser wallet: a persisted private testnet account whose ID +
    live OBX balance come straight from the SDK. connect() creates one on first
@@ -519,6 +541,33 @@ function useLiveMarkets(client, isReady, pausedRef, runExclusive) {
   return live;
 }
 
+// Polymarket is a public reference feed only. Stakes, private notes and
+// settlement remain on Miden; no Polygon wallet or CLOB order is created here.
+function usePolymarketMarkets() {
+  const [quotes, setQuotes] = React.useState({});
+  React.useEffect(() => {
+    const mirrors = (window.OBS.markets || []).filter((market) => market.polymarketSlug);
+    if (!mirrors.length) return;
+    let alive = true;
+    const controller = new AbortController();
+    const tick = async () => {
+      const results = await Promise.allSettled(
+        mirrors.map(async (market) => [market.id, await fetchPolymarketMarket(market.polymarketSlug, controller.signal)]),
+      );
+      if (!alive) return;
+      const next = {};
+      for (const result of results) {
+        if (result.status === "fulfilled") next[result.value[0]] = result.value[1];
+      }
+      if (Object.keys(next).length) setQuotes((current) => ({ ...current, ...next }));
+    };
+    tick();
+    const interval = setInterval(tick, 30_000);
+    return () => { alive = false; controller.abort(); clearInterval(interval); };
+  }, []);
+  return quotes;
+}
+
 /* Subrosa prototype — root app: routing, state, seal flow.
    The seal UX is the design's; place() ALSO fires a REAL on-chain tx (private
    account + position note) and surfaces its hash in the seal + positions. */
@@ -550,6 +599,7 @@ function App() {
   React.useEffect(() => {
     if (isReady && client) window.__subrosaReadMarket = (hex) => readMarketState(client, hex || MARKET_ID_HEX);
   }, [isReady, client]);
+  React.useEffect(() => { window.__subrosaLoadPlaceScript = loadPlaceScript; }, []);
   const [mfFunding, setMfFunding] = React.useState(false);
   const [mfFundMsg, setMfFundMsg] = React.useState(null);
   // Pause background WASM reads while ANY heavy wallet op is in flight — a
@@ -560,7 +610,9 @@ function App() {
   const walletBusyRef = React.useRef(false);
   walletBusyRef.current = !!coSignStep || !!seal || builtin.funding || mfFunding;
   const live = useLiveMarkets(client, isReady, walletBusyRef, runExclusive);
+  const polymarket = usePolymarketMarkets();
   React.useEffect(() => { window.__subrosaLive = live; }, [live]);
+  React.useEffect(() => { window.__subrosaPolymarket = polymarket; }, [polymarket]);
 
   // Fund the EXTERNAL MidenFi wallet: our web client mints a public OBX note to
   // its address (we hold the faucet key), then the extension consumes it via
@@ -657,6 +709,11 @@ function App() {
     commitment: rt?.noteId ? shortHex(rt.noteId) : (rt?.tx ? shortHex(rt.tx) : "(private)"),
     tx: rt?.tx, noteId: rt?.noteId, account: rt?.account, coSignMultisig: rt?.coSignMultisig,
     viaMidenFi: !!rt?.viaMidenFi, revealed: false, confirmed: !!confirmed,
+    question: o.market.question,
+    polymarketSlug: o.market._polymarket?.slug ?? o.market.polymarketSlug ?? null,
+    polymarketConditionId: o.market._polymarket?.conditionId ?? null,
+    polymarketReferencePrice: o.market._polymarket?.yesPrice ?? null,
+    executionQueued: !!rt?.executionQueued,
   });
   const upsertPosition = (pos) => setPositions((ps) => {
     // Look for an existing position with the same marketId AND side
@@ -780,60 +837,12 @@ function App() {
       }
       setSeal({ order: { ...order, placeId } });
 
-      // If MidenFi is the active wallet, the bet is SIGNED BY THE EXTENSION and
-      // paid from the MidenFi wallet (pop-up + balance drop): send the stake to
-      // the market account via the adapter. (The built-in path below uses the
-      // private place-note + commitment.)
+      // Miden Wallet's adapter currently exposes standard sends but not custom
+      // note scripts. A standard send to this contract would be unconsumable,
+      // so fail before moving funds and require the built-in wallet for now.
       if (mf.connected && mf.address && mf.requestSend) {
-        try {
-          const marketHex = (order.market && LIVE_MARKETS[order.market.id]) || MARKET_ID_HEX;
-          // The Miden Wallet may hold OBX from a faucet that differs from the
-          // app's current web faucet (e.g. after a faucet refresh). Stake from a
-          // faucet the wallet ACTUALLY holds enough of, so the send can succeed.
-          const need = Number(parseAssetAmount(String(order.amount), FUND_DECIMALS));
-          const lsFid = (() => { try { return localStorage.getItem(FAUCET_LS); } catch (e) { return null; } })();
-          const held = (mf.assets || []).map((x) => ({ id: x.faucetId ?? x.assetId, amt: Number(x.amount ?? x.balance ?? 0) })).filter((h) => h.id);
-          const faucetHex = (
-            held.find((h) => lsFid && sameFaucet(h.id, lsFid) && h.amt >= need) ||
-            held.filter((h) => h.amt >= need).sort((p, q) => q.amt - p.amt)[0] ||
-            held.sort((p, q) => q.amt - p.amt)[0]
-          )?.id;
-          if (!faucetHex) throw new Error("Your Miden Wallet has no OBX to stake — fund it first.");
-          window.txToast?.({ kind: "cosign", title: "Approve in Miden Wallet", desc: "Confirm the transaction in your wallet extension to stake your OBX." });
-          // requestSend resolves to a request id (a UUID), NOT the on-chain tx
-          // hash. waitForTransaction blocks until the extension proves + submits,
-          // then returns { txHash, outputNotes } — the real Miden tx hash and the
-          // private output note (our position commitment).
-          const reqId = await mf.requestSend({
-            senderAddress: mf.address,
-            recipientAddress: marketHex,
-            faucetId: faucetHex,
-            noteType: "private",
-            amount: Number(parseAssetAmount(String(order.amount), FUND_DECIMALS)),
-          });
-          window.txToast?.({ kind: "cosign", title: "Settling on-chain…", desc: "Your Miden Wallet is proving + submitting the transaction." });
-          let tx = null, noteId = null;
-          try {
-            const out = await mf.waitForTransaction?.(reqId, 180_000);
-            if (out?.errorMessage) throw new Error(out.errorMessage);
-            tx = out?.txHash ?? null;
-            const notes = out?.outputNotes;
-            const first = Array.isArray(notes) ? notes[0] : null;
-            noteId = (first && (typeof first === "string" ? first : (first.id?.()?.toString?.() ?? String(first)))) || null;
-          } catch (e) {
-            console.warn("[place:midenfi] waitForTransaction:", e?.message || e);
-          }
-          const rt = { tx, account: mf.address, marketHex, noteId, coSignMultisig, viaMidenFi: true };
-          setRealTx(rt);
-          // Record the position ONLY now that the send went through.
-          upsertPosition(buildPosition({ ...order, placeId }, rt, true));
-          setTimeout(() => { try { mf.refreshAssets?.(); } catch (e) {} }, 3000);
-          window.txToast?.({ kind: "tx", title: `${order.side} position placed · ${order.amount} OBX (Miden Wallet)`, desc: "Signed by your Miden Wallet and staked to the market — balance debited from your external wallet.", tx, account: mf.address });
-        } catch (e) {
-          console.warn("[place:midenfi] failed:", e);
-          window.txToast?.({ kind: "error", title: "Miden Wallet place failed", desc: String(e?.message || e).slice(0, 140) });
-          setSeal(null); // don't leave the seal stuck on "sealing…"
-        }
+        window.txToast?.({ kind: "error", title: "Built-in wallet required", desc: "Miden Wallet does not support this market's custom execution note yet. No funds moved." });
+        setSeal(null);
         return;
       }
 
@@ -844,28 +853,19 @@ function App() {
         const faucetHex = (() => { try { return localStorage.getItem(FAUCET_LS); } catch (e) { return null; } })();
         if (!faucetHex || !(order.amount > 0)) throw new Error("Fund your wallet with OBX before placing a position.");
 
-        // ── 0.15 position note (degraded path — see docs/VERSIONS.md) ──────────
-        // The custom place_note.masp is package format v2, which the 0.15 client
-        // rejects ("Got [0,0,2], only [0,0,3] supported"), and the market accounts
-        // are 0.14-format — both dead on the reset 0.15 network and blocked upstream
-        // (no working v3 contract toolchain yet). Until that lands we stake `amount`
-        // OBX into a private note built from the SDK's well-known P2ID script
-        // (NoteScript.p2id()) instead of the custom market note, emitted as an OWN
-        // OUTPUT note (withOwnOutputNotes) so it's tracked locally with NO note
-        // transport — the same reason funding's own notes work on 0.15 (a `send()`
-        // P2P private note fails: "note transport is disabled"). This is a genuine
-        // on-chain private commitment (the chain sees only the note's hash); what's
-        // deferred is the market-procedure call that moves public odds. When v3
-        // ships, restore the place_note.masp + NoteTag.withAccountTarget(market).
-        const ns = NoteScript.p2id();
+        // Protocol-0.15 place note. The sender locks exactly `amount` OBX in a
+        // public note whose script calls market.place(side). The market derives
+        // reserve movement from that asset and deposits it into its own vault;
+        // caller-supplied amounts are never trusted. The operator consumes these
+        // notes against the Falcon-authenticated public market account.
+        const marketRef = toAccountId(marketHex);
+        const ns = await loadPlaceScript(order.side);
         let res, noteId;
         for (let attempt = 1; attempt <= 3; attempt++) {
           try {
             const assets = new NoteAssets([new FungibleAsset(toAccountId(faucetHex), parseAssetAmount(String(order.amount), FUND_DECIMALS))]);
             const rec = new NoteRecipient(randomWord(), ns, new NoteStorage(new FeltArray()));
-            // Tag the note to your OWN account (a valid 0.15 id) — the dead 0.14
-            // market id would throw at AccountId parsing.
-            const meta = new NoteMetadata(signerRef, NoteType.Private, NoteTag.withAccountTarget(signerRef));
+            const meta = new NoteMetadata(signerRef, NoteType.Public, NoteTag.withAccountTarget(marketRef));
             const note = new Note(assets, meta, rec);
             noteId = (() => { try { return note.id().toString(); } catch (e) { return null; } })();
             const req = new TransactionRequestBuilder().withOwnOutputNotes(new NoteArray([note])).build();
@@ -877,15 +877,15 @@ function App() {
             await new Promise((r) => setTimeout(r, 2000 * attempt));
           }
         }
-        const rt = { tx: res.transactionId, account: signerRef.toString(), marketHex, noteId, coSignMultisig };
+        const rt = { tx: res.transactionId, account: signerRef.toString(), marketHex, noteId, coSignMultisig, executionQueued: true };
         setRealTx(rt);
         // Record the position ONLY now that the on-chain tx succeeded.
         upsertPosition(buildPosition({ ...order, placeId }, rt, true));
         setTimeout(() => { try { builtin.refetch?.(); } catch (e) {} }, 2500); // reflect the lower balance
         window.txToast?.({
           kind: coSignMultisig ? "cosign" : "tx",
-          title: `${order.side} position sealed · ${order.amount} OBX staked${coSignMultisig ? " · Guardian-co-signed" : ""}`,
-          desc: `Your ${order.side} stake of ${order.amount} OBX is locked into a private position note${coSignMultisig ? ", approved by a 2-of-N Guardian co-sign" : ""}. The chain records only its commitment — side, size and owner stay private.`,
+          title: `${order.side} position queued · ${order.amount} OBX staked${coSignMultisig ? " · Guardian-co-signed" : ""}`,
+          desc: `Your stake is locked in a Miden execution note. The operator consumes it against the market, which deposits the collateral and updates reserves atomically.`,
           tx: res.transactionId,
           account: signerRef.toString(),
         });
@@ -906,11 +906,11 @@ function App() {
   };
 
   let screen;
-  if (route === "detail" && market) screen = <window.MarketDetail m={market} go={go} onPlace={place} balance={liveBalance} liveMarkets={live} addresses={LIVE_MARKETS} />;
+  if (route === "detail" && market) screen = <window.MarketDetail m={market} go={go} onPlace={place} balance={liveBalance} liveMarkets={live} polymarketMarkets={polymarket} addresses={LIVE_MARKETS} />;
   else if (route === "positions") screen = <window.PositionsScreen positions={positions} balance={liveBalance} go={go} live={live} onRedeem={redeem} />;
   else if (route === "agents") screen = <window.AgentsScreen agents={agents} onPropose={proposeAboveCap} />;
   else if (route === "approvals") screen = <window.ApprovalsScreen approvals={approvals} onCoSign={coSignApproval} onDecline={declineApproval} go={go} />;
-  else screen = <window.MarketsHome onOpen={openMarket} liveMarkets={live} />;
+  else screen = <window.MarketsHome onOpen={openMarket} liveMarkets={live} polymarketMarkets={polymarket} />;
 
   const topLeft = route === "detail"
     ? <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13.5, color: "var(--faint)" }}>

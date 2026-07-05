@@ -15,12 +15,19 @@ const fmtUnits = (n) => (n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1) + "k
 // Overlay real on-chain state onto a market when it's backed by a live account
 // (window.LIVE_MARKETS). Odds/volume/liquidity become real; a `_live` flag
 // drives the LIVE badge. Other fields stay as display decoration for now.
-function withLive(m, live) {
+function withLive(m, live, polymarket) {
   const L = live && live[m.id];
-  if (!L) return m;
-  return {
+  const P = polymarket && polymarket[m.id];
+  const base = P ? {
     ...m,
-    yes: Math.round(L.yesPct),
+    question: P.question,
+    closes: P.endDate ? new Date(P.endDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : m.closes,
+    _polymarket: P,
+  } : m;
+  if (!L) return base;
+  return {
+    ...base,
+    yes: L.yesPct,
     volume: fmtUnits(L.volume) + " OBX",
     liquidity: fmtUnits(L.liquidity) + " OBX",
     _live: true,
@@ -41,8 +48,8 @@ function MarketTile({ m, onOpen }) {
   const [h, setH] = uS(false);
   const up = m.change >= 0;
   return (
-    <div onClick={() => onOpen(m)} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
-      style={{ background: "var(--surface)", border: `1px solid ${h ? "var(--hair-2)" : "var(--hair)"}`, borderRadius: "var(--r)", padding: 18, cursor: "pointer", transition: "all 180ms cubic-bezier(0.22,1,0.36,1)", transform: h ? "translateY(-3px)" : "none", boxShadow: h ? "0 16px 36px rgba(12,12,14,0.10), 0 0 0 1px rgba(255,85,0,0.10)" : "0 1px 2px rgba(12,12,14,0.05)", display: "flex", flexDirection: "column", gap: 14, minHeight: 196 }}>
+    <button type="button" onClick={() => onOpen(m)} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
+      style={{ width: "100%", font: "inherit", textAlign: "left", background: "var(--surface)", color: "inherit", border: `1px solid ${h ? "var(--hair-2)" : "var(--hair)"}`, borderRadius: "var(--r)", padding: 18, cursor: "pointer", transition: "transform 180ms cubic-bezier(0.22,1,0.36,1), box-shadow 180ms ease, border-color 180ms ease", transform: h ? "translateY(-3px)" : "none", boxShadow: h ? "0 16px 36px rgba(12,12,14,0.10), 0 0 0 1px rgba(255,85,0,0.10)" : "0 1px 2px rgba(12,12,14,0.05)", display: "flex", flexDirection: "column", gap: 14, minHeight: 196 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <window.Cat name={m.category} />
         {m._resolution ? (
@@ -57,6 +64,12 @@ function MarketTile({ m, onOpen }) {
         )}
       </div>
       <h3 style={{ fontFamily: "var(--disp)", fontWeight: 500, fontSize: 16.5, lineHeight: 1.28, letterSpacing: "-0.01em", color: "var(--text)", margin: 0, minHeight: 42 }}>{m.question}</h3>
+      {m._polymarket ? (
+        <div className="mono" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, fontSize: 11, color: "var(--faint)" }}>
+          <span>POLYMARKET REF</span>
+          <span style={{ color: "var(--text)" }}>{(m._polymarket.yesPrice * 100).toFixed(1)}¢ YES</span>
+        </div>
+      ) : null}
       <div style={{ marginTop: "auto" }}>
         <window.OddsBar yes={m.yes} showLabels={true} labelSize={12} height={7} />
       </div>
@@ -67,7 +80,7 @@ function MarketTile({ m, onOpen }) {
           <span style={{ fontSize: 12, color: "var(--faint)" }}>{m.closesIn}</span>
         </span>
       </div>
-    </div>
+    </button>
   );
 }
 
@@ -103,10 +116,10 @@ function HeroHalftone() {
 }
 
 /* ---------- markets home ---------- */
-function MarketsHome({ onOpen, liveMarkets }) {
+function MarketsHome({ onOpen, liveMarkets, polymarketMarkets }) {
   const cats = ["All", ...Array.from(new Set(window.OBS.markets.map((m) => m.category)))];
   const [f, setF] = uS("All");
-  const base = window.OBS.markets.map((m) => withLive(m, liveMarkets));
+  const base = window.OBS.markets.map((m) => withLive(m, liveMarkets, polymarketMarkets));
   const shown = f === "All" ? base : base.filter((m) => m.category === f);
   return (
     <div className="scroll" style={{ overflowY: "auto", height: "100%" }}>
@@ -115,9 +128,9 @@ function MarketsHome({ onOpen, liveMarkets }) {
         <div className="hero-band" style={{ position: "relative", display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 26 }}>
           <HeroHalftone />
           <div style={{ position: "relative", zIndex: 1 }}>
-            <span className="tag" style={{ color: "var(--accent)" }}>PRIVATE PREDICTION MARKETS · ON MIDEN</span>
-            <h1 style={{ fontFamily: "var(--disp)", fontWeight: 700, fontSize: 38, letterSpacing: "-0.022em", color: "var(--text)", margin: "12px 0 8px", lineHeight: 1.04 }}>Bet without being watched.</h1>
-            <p style={{ fontSize: 15.5, color: "var(--muted)", margin: 0, maxWidth: 540 }}>Public, trustworthy odds — your position, size and P&amp;L stay private. Only a commitment is recorded on-chain.</p>
+            <span className="tag" style={{ color: "var(--accent)" }}>PREDICTION MARKETS · SETTLED ON MIDEN</span>
+            <h1 style={{ fontFamily: "var(--disp)", fontWeight: 700, fontSize: 38, letterSpacing: "-0.022em", color: "var(--text)", margin: "12px 0 8px", lineHeight: 1.04 }}>External signals. Miden execution.</h1>
+            <p style={{ fontSize: 15.5, color: "var(--muted)", margin: 0, maxWidth: 540 }}>Compare Polymarket pricing with a collateralized Miden pool. Execution notes are public in the current beta.</p>
           </div>
           <div style={{ position: "relative", zIndex: 1, display: "flex", gap: 30, paddingBottom: 4 }}>
             {[["Markets", String(window.OBS.markets.length)], ["Odds", "Public"], ["Positions", "Private"]].map(([l, v]) => (
@@ -271,6 +284,10 @@ function ResolvedPanel({ m, resolution }) {
 }
 
 /* ---------- bet panel ---------- */
+// Guardian co-sign UI is hidden for now (flip to true to bring the toggle back;
+// the whole co-sign path in app.tsx stays intact and dormant).
+const GUARDIAN_ENABLED = false;
+
 function BetPanel({ m, balance, onPlace }) {
   const [side, setSide] = uS("YES");
   const [amt, setAmt] = uS(250);
@@ -290,7 +307,7 @@ function BetPanel({ m, balance, onPlace }) {
     <div className="bet-panel" style={{ position: "sticky", top: 0, background: "var(--glass)", backdropFilter: "blur(14px)", border: "1px solid var(--hair-2)", borderRadius: "var(--r)", padding: 20, boxShadow: "0 20px 50px rgba(12,12,14,0.12)" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
         <span style={{ fontFamily: "var(--disp)", fontWeight: 700, fontSize: 16, color: "var(--text)" }}>Place position</span>
-        <window.StatusTag kind="private" />
+        <window.StatusTag kind={m._polymarket ? "public" : "private"} />
       </div>
 
       {/* YES / NO toggle */}
@@ -339,23 +356,25 @@ function BetPanel({ m, balance, onPlace }) {
         <Row k="Profit" v={`${profit >= 0 ? "+" : ""}${window.fmtUsd(profit)} · ${roi >= 0 ? "+" : ""}${roi.toFixed(0)}%`} vc="var(--yes)" />
       </div>
 
-      {/* optional Guardian co-sign on this bet */}
-      <button onClick={() => setProtect((p) => !p)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "11px 13px", marginBottom: 12, borderRadius: "var(--r-md)", cursor: "pointer", textAlign: "left", border: `1px solid ${protect ? "var(--accent)" : "var(--hair-2)"}`, background: protect ? "var(--accent-dim)" : "var(--surface)", transition: "all 140ms ease" }}>
-        <window.Icon name="shield-check" size={16} color={protect ? "var(--accent)" : "var(--faint)"} />
-        <span style={{ flex: 1, minWidth: 0 }}>
-          <span style={{ display: "block", fontSize: 12.5, fontWeight: 600, color: "var(--text)" }}>Protect with Guardian</span>
-          <span style={{ display: "block", fontSize: 11, color: "var(--faint)" }}>Require a 2-of-N co-sign before this bet lands</span>
-        </span>
-        <span role="switch" aria-checked={protect} style={{ position: "relative", width: 38, height: 22, borderRadius: 999, flex: "none", background: protect ? "var(--accent)" : "var(--hair-2)", transition: "background 180ms" }}>
-          <span style={{ position: "absolute", top: 3, left: protect ? 19 : 3, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left 180ms", boxShadow: "0 1px 3px rgba(0,0,0,0.3)" }} />
-        </span>
-      </button>
+      {/* optional Guardian co-sign on this bet (hidden while GUARDIAN_ENABLED is false) */}
+      {GUARDIAN_ENABLED && (
+        <button onClick={() => setProtect((p) => !p)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "11px 13px", marginBottom: 12, borderRadius: "var(--r-md)", cursor: "pointer", textAlign: "left", border: `1px solid ${protect ? "var(--accent)" : "var(--hair-2)"}`, background: protect ? "var(--accent-dim)" : "var(--surface)", transition: "all 140ms ease" }}>
+          <window.Icon name="shield-check" size={16} color={protect ? "var(--accent)" : "var(--faint)"} />
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ display: "block", fontSize: 12.5, fontWeight: 600, color: "var(--text)" }}>Protect with Guardian</span>
+            <span style={{ display: "block", fontSize: 11, color: "var(--faint)" }}>Require a 2-of-N co-sign before this bet lands</span>
+          </span>
+          <span role="switch" aria-checked={protect} style={{ position: "relative", width: 38, height: 22, borderRadius: 999, flex: "none", background: protect ? "var(--accent)" : "var(--hair-2)", transition: "background 180ms" }}>
+            <span style={{ position: "absolute", top: 3, left: protect ? 19 : 3, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left 180ms", boxShadow: "0 1px 3px rgba(0,0,0,0.3)" }} />
+          </span>
+        </button>
+      )}
 
       <window.Btn variant="primary" size="lg" full icon="lock" onClick={() => onPlace({ market: m, side, amount: amt, price, shares, protect })}>
-        {protect ? "Co-sign & place position" : "Place private position"}
+        {protect ? "Co-sign & queue position" : m._polymarket ? "Queue Miden position" : "Place private position"}
       </window.Btn>
       <p style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, margin: "12px 0 0", fontSize: 11.5, color: "var(--faint)", textAlign: "center" }}>
-        <window.Icon name="eye-off" size={13} color="var(--faint)" /> {protect ? "Guardian co-signs, then your stake is sealed as a private commitment." : "Recorded as a commitment — no owner, side or size revealed."}
+        <window.Icon name={m._polymarket ? "radio" : "eye-off"} size={13} color="var(--faint)" /> {m._polymarket ? "Execution note is public; settlement and collateral remain on Miden." : protect ? "Guardian co-signs, then your stake is sealed as a private commitment." : "Recorded as a commitment — no owner, side or size revealed."}
       </p>
     </div>
   );
@@ -371,8 +390,8 @@ function Row({ k, v, vc, big }) {
 }
 
 /* ---------- market detail ---------- */
-function MarketDetail({ m: m0, go, onPlace, balance, liveMarkets, addresses }) {
-  const m = withLive(m0, liveMarkets);
+function MarketDetail({ m: m0, go, onPlace, balance, liveMarkets, polymarketMarkets, addresses }) {
+  const m = withLive(m0, liveMarkets, polymarketMarkets);
   const isLive = !!m._live;
   const ls = liveMarkets ? liveMarkets[m0.id] : null; // raw on-chain reserves
   const marketHex = addresses ? addresses[m0.id] : null; // on-chain account id
@@ -418,6 +437,14 @@ function MarketDetail({ m: m0, go, onPlace, balance, liveMarkets, addresses }) {
                     <span style={{ width: 6, height: 6, borderRadius: "50%", background: isLive ? "var(--yes)" : "var(--faint)", animation: isLive ? "blink 1.6s infinite" : "none" }} />
                     <span className="mono" style={{ fontSize: 11.5, color: "var(--faint)" }}>{isLive ? "live from on-chain reserves" : "preview odds"}</span>
                   </div>
+                  {m._polymarket ? (
+                    <div className="mono" style={{ fontSize: 11.5, color: "var(--faint)", marginTop: 7 }}>
+                      Polymarket reference <b style={{ color: "var(--text)" }}>{(m._polymarket.yesPrice * 100).toFixed(1)}¢</b>
+                      {m._polymarket.bestBid !== null && m._polymarket.bestAsk !== null
+                        ? ` · ${Math.round(m._polymarket.bestBid * 1000) / 10}–${Math.round(m._polymarket.bestAsk * 1000) / 10}¢ bid/ask`
+                        : ""}
+                    </div>
+                  ) : null}
                 </div>
                 <div style={{ textAlign: "right" }}>
                   <div className="mono" style={{ fontSize: 12, color: "var(--faint)" }}>NO {window.fmtPct(100 - (isLive ? m.yes : live))}</div>
@@ -448,7 +475,7 @@ function MarketDetail({ m: m0, go, onPlace, balance, liveMarkets, addresses }) {
             {/* stats — real for live markets */}
             <div className="grid-stats" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
               {(isLive
-                ? [["Volume", m.volume, "activity"], ["Liquidity", m.liquidity, "droplet"], ["Resolution", resLabel, "shield-check"], ["Source", "On-chain", "radio"]]
+                ? [["Volume", m.volume, "activity"], ["Liquidity", m.liquidity, "droplet"], ["Resolution", resLabel, "shield-check"], ["Source", m._polymarket ? "Miden + Poly" : "On-chain", "radio"]]
                 : [["Volume", m.volume, "activity"], ["Liquidity", m.liquidity, "droplet"], ["Resolves", m.closes, "clock"], ["Status", "Preview", "clock"]]
               ).map(([k, v, ic]) => (
                 <div key={k} style={{ background: "var(--surface)", border: "1px solid var(--hair)", borderRadius: "var(--r-md)", padding: 14 }}>
@@ -469,7 +496,7 @@ function MarketDetail({ m: m0, go, onPlace, balance, liveMarkets, addresses }) {
                   </div>
                   <span className="tag" style={{ color: m._resolution ? (m._resolution === 1 ? "var(--yes)" : "var(--no)") : "var(--faint)", background: m._resolution ? (m._resolution === 1 ? "var(--yes-dim)" : "var(--no-dim)") : "transparent", padding: m._resolution ? "3px 8px" : 0, borderRadius: 999 }}>{resLabel}</span>
                 </div>
-                <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: "var(--muted)" }}>Settled on-chain by the <b style={{ color: "var(--text)" }}>resolver</b>: a designated key writes the outcome into the market account's public <span className="mono">resolution</span> slot. Winners redeem against the market; the contract rejects losing redemptions on-chain.</p>
+                <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: "var(--muted)" }}>{m._polymarket ? <>Polymarket provides the external market reference. A resolver relays its finalized outcome into Miden's public <span className="mono">resolution</span> slot; collateral and settlement remain on Miden. Execution notes are public in this beta.</> : <>Settled on-chain by the <b style={{ color: "var(--text)" }}>resolver</b>: a designated key writes the outcome into the market account's public <span className="mono">resolution</span> slot. Winners redeem against the market; the contract rejects losing redemptions on-chain.</>}</p>
               </div>
               <div style={{ background: "var(--surface)", border: "1px solid var(--hair)", borderRadius: "var(--r)", padding: 18 }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>

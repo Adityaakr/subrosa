@@ -12,15 +12,17 @@ export const MIDEN_PROVER =
 
 export const EXPLORER_BASE_URL = "https://testnet.midenscan.com";
 
-// The market account deployed on testnet (public reserves) + its collateral faucet.
-export const MARKET_ID_HEX = "0x5ff0303f0b795d1039ca5b51d8480b";
+// The market accounts deployed on testnet (public reserves) + the collateral faucet.
+export const MARKET_ID_HEX = "0xabbba77bce4bc6d1795be21b30fa5e";
+export const ETH_MARKET_ID_HEX = "0x72d3ac938ff65611194c3e21d118e9";
+export const FED_MARKET_ID_HEX = "0xca646b034eb701311909b674f207ac";
 export const OBX_FAUCET_HEX = "0x1201d9f8819d5220778535e4e2f08a";
 
 // StorageValue slot names exported by the market component.
-export const SLOT_YES = "miden_market::market::yes_reserve";
-export const SLOT_NO = "miden_market::market::no_reserve";
-export const SLOT_VOL = "miden_market::market::total_volume";
-export const SLOT_RES = "miden_market::market::resolution";
+export const SLOT_YES = "market::market::yes_reserve";
+export const SLOT_NO = "market::market::no_reserve";
+export const SLOT_VOL = "market::market::total_volume";
+export const SLOT_RES = "market::market::resolution";
 
 export type Market = {
   id: string;
@@ -37,28 +39,28 @@ export const MARKETS: Market[] = [
   {
     id: "miden-mainnet",
     live: true,
-    category: "Infra",
+    category: "Sports",
     color: "#FF5500",
-    question: "Will Miden mainnet launch before Aug 1?",
-    closes: "47d",
-    volume: "$126k",
+    question: "Will Morocco win the 2026 FIFA World Cup?",
+    closes: "15d",
+    volume: "0 OBX",
   },
   {
-    id: "eth-4000",
+    id: "eth-4k",
+    live: true,
     category: "Crypto",
     color: "#066EFF",
-    question: "Will ETH close above $4,000 on Jul 31?",
-    closes: "45d",
-    volume: "$412k",
-    yesPct: 63,
+    question: "Will Ethereum reach $2,000 in July?",
+    closes: "26d",
+    volume: "0 OBX",
   },
   {
-    id: "fed-cut",
+    id: "fed-sep",
+    live: true,
     category: "Macro",
     color: "#A300D6",
-    question: "Will the Fed cut rates in September?",
-    closes: "93d",
-    volume: "$908k",
-    yesPct: 45,
+    question: "Fed rate cut by September 2026 meeting?",
+    closes: "73d",
+    volume: "0 OBX",
   },
 ];
