@@ -6,12 +6,15 @@
   "description": "Subrosa confidential trading agent — autonomous private positions with Guardian-coordinated human co-sign above a size cap",
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test src/*.test.ts",
     "start": "tsx src/agent.ts",
     "cosign": "tsx src/cosign-demo.ts",
     "guardian:up": "docker compose -f docker/guardian-compose.yml up --build -d",
     "guardian:down": "docker compose -f docker/guardian-compose.yml down",
     "fund-service": "tsx src/fund-service.ts",
-    "redeem-service": "tsx src/redeem-service.ts"
+    "redeem-service": "tsx src/redeem-service.ts",
+    "market-operator": "tsx src/market-operator.ts",
+    "resolution-relay": "tsx src/resolution-relay.ts"
   },
   "dependencies": {
     "@miden-sdk/miden-sdk": "0.14.5",

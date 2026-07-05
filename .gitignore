@@ -27,3 +27,6 @@ dist/
 # autonomous agent runtime files
 agent/.agent-status.json
 agent/.agent-stop
+
+# prism local orchestration state
+.prism/

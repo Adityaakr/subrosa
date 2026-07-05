@@ -1,5 +1,5 @@
 [package]
-name = "place_no_note"
+name = "resolve-no"
 version = "0.1.0"
 edition = "2024"
 
@@ -10,14 +10,13 @@ crate-type = ["cdylib"]
 miden = { version = "0.13" }
 
 [package.metadata.component]
-package = "miden:place-no-note"
+package = "miden:resolve-no"
 
 [package.metadata.miden]
-project-kind = "note-script"
+project-kind = "transaction-script"
 
-# Consumed by the network-mode market account, which exposes `place`.
 [package.metadata.miden.dependencies]
-"miden:market" = { path = "../../market" }
+"miden:market" = { path = "../../contracts/market" }
 
 [package.metadata.component.target.dependencies]
-"miden:market" = { path = "../../market/target/generated-wit/" }
+"miden:market" = { path = "../../contracts/market/target/generated-wit/" }

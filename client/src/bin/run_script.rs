@@ -5,7 +5,7 @@
 //! Opens the CLI's existing `.miden` store/keystore, loads the compiled
 //! transaction-script package, builds a custom-script transaction, proves it
 //! locally, and submits it. Used to drive the market's `place` / `resolve`
-//! procedures in the Phase-2 lifecycle. API verified against miden-client 0.14.9.
+//! procedures in the Phase-2 lifecycle. API verified against miden-client 0.15.3.
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -18,8 +18,8 @@ use miden_client::utils::Deserializable;
 use miden_client::vm::Package;
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
 
-const STORE: &str = ".miden/store.sqlite3";
-const KEYSTORE: &str = ".miden/keystore";
+const STORE: &str = "operator/.miden/store.sqlite3";
+const KEYSTORE: &str = "operator/.miden/keystore";
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

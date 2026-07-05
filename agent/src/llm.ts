@@ -3,13 +3,14 @@
 // resulting commitment ever touches the chain.
 import { OPENROUTER_API_KEY, OPENROUTER_MODEL, MARKET_QUESTION, AUTONOMOUS_CAP } from "./config.js";
 import type { MarketOdds } from "./onchain.js";
+import type { PolymarketReference } from "./polymarket.js";
 import type { Decision } from "./strategy.js";
 
 export function llmConfigured(): boolean {
   return OPENROUTER_API_KEY.length > 0;
 }
 
-export async function llmDecide(odds: MarketOdds): Promise<Decision> {
+export async function llmDecide(odds: MarketOdds, reference: PolymarketReference | null = null): Promise<Decision> {
   const total = odds.yes + odds.no;
   if (odds.resolution !== 0n || total === 0n) return null;
   const yesProbPct = Number((odds.no * 10000n) / total) / 100; // P(YES)=no/(yes+no)
@@ -23,6 +24,7 @@ export async function llmDecide(odds: MarketOdds): Promise<Decision> {
   const user =
     `Market: "${MARKET_QUESTION}"\n` +
     `Implied P(YES) = ${yesProbPct.toFixed(1)}%  (reserves yes=${odds.yes} no=${odds.no})\n` +
+    (reference ? `Polymarket reference P(YES) = ${(reference.yesPrice * 100).toFixed(1)}% (condition ${reference.conditionId})\n` : "") +
     `Autonomous cap = ${AUTONOMOUS_CAP} OBX (trades above it need human co-sign).\n` +
     "Decide.";
 

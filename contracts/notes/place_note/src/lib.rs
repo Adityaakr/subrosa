@@ -1,17 +1,18 @@
 #![no_std]
 #![feature(alloc_error_handler)]
 
-//! Subrosa — place-position note (YES, 250). A PRIVATE note a trader creates
+//! Subrosa — place-position note (YES). A note a trader creates
 //! from the browser, addressed to the NETWORK-mode market; when the operator
-//! consumes it against the market it calls `place(YES, 250)` — moving public
-//! odds — while the note stays a commitment on-chain. (Fixed amount in v1; a
-//! parametrized note hit a midenc f32-const limitation reading Felt inputs.)
+//! consumes it against the market it deposits the note's single fungible asset
+//! and calls `place(YES, amount)` — moving public odds while keeping the holder's
+//! separate position commitment private.
 
 extern crate alloc;
 
-use bindings::miden::market::market::place;
-use bindings::Account;
-use miden::{felt, note, Word};
+use miden::{account, felt, note, Word};
+
+#[account(market::Market)]
+pub struct NativeAccount;
 
 #[note]
 struct PlaceNote {}
@@ -19,7 +20,7 @@ struct PlaceNote {}
 #[note]
 impl PlaceNote {
     #[note_script]
-    pub fn run(self, _arg: Word, _account: &mut Account) {
-        place(felt!(1), felt!(250));
+    pub fn run(self, _arg: Word, account: &mut NativeAccount) {
+        account.place(felt!(1));
     }
 }

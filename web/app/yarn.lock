@@ -395,17 +395,17 @@
     "@jridgewell/resolve-uri" "^3.1.0"
     "@jridgewell/sourcemap-codec" "^1.4.14"
 
-"@miden-sdk/miden-sdk@0.15.2":
-  version "0.15.2"
-  resolved "https://registry.npmjs.org/@miden-sdk/miden-sdk/-/miden-sdk-0.15.2.tgz"
-  integrity sha512-0ww0aKrTZlLOpn9TbPnYg5erqE+j5QOqqGBn1ki/ku6iJRvkHyZquQPIz2CWi76AOAnUt+OZLKoMNEZ0X2RFww==
+"@miden-sdk/miden-sdk@0.15.4":
+  version "0.15.4"
+  resolved "https://registry.npmjs.org/@miden-sdk/miden-sdk/-/miden-sdk-0.15.4.tgz"
+  integrity sha512-Hr2nZxLxKpqTGXBwXS2Pu6+8QSC2xKuhDQJSZvV6m160Q3hFd3l3pUX6vpZcwdDpzfkruROlpYQSkjLv+505tg==
   dependencies:
     dexie "^4.0.1"
     glob "^11.0.0"
   optionalDependencies:
-    "@miden-sdk/node-darwin-arm64" "0.15.2"
-    "@miden-sdk/node-darwin-x64" "0.15.2"
-    "@miden-sdk/node-linux-x64-gnu" "0.15.2"
+    "@miden-sdk/node-darwin-arm64" "0.15.4"
+    "@miden-sdk/node-darwin-x64" "0.15.4"
+    "@miden-sdk/node-linux-x64-gnu" "0.15.4"
 
 "@miden-sdk/miden-wallet-adapter-base@^0.15.1":
   version "0.15.1"
@@ -430,22 +430,22 @@
     "@miden-sdk/miden-wallet-adapter-base" "^0.15.1"
     "@miden-sdk/miden-wallet-adapter-miden" "^0.15.1"
 
-"@miden-sdk/node-darwin-arm64@0.15.2":
-  version "0.15.2"
-  resolved "https://registry.npmjs.org/@miden-sdk/node-darwin-arm64/-/node-darwin-arm64-0.15.2.tgz"
-  integrity sha512-Y4cZjjSImHC1AwAlk+xWp661+3LIIzlHB/1saDCSr4pAvufoMCou2vRRP+l4vwAT+9iDvLwi1iSw2qfybCORiA==
+"@miden-sdk/node-darwin-arm64@0.15.4":
+  version "0.15.4"
+  resolved "https://registry.npmjs.org/@miden-sdk/node-darwin-arm64/-/node-darwin-arm64-0.15.4.tgz"
+  integrity sha512-8Za5LmDoW26kIgZIDM4+MoxBo9L3D5uIYLOqfynVZILs8JJNz0sKKYzBwWV8DkCofxNFnTsk1cIWJkSty/SAbA==
 
-"@miden-sdk/react@^0.15.1", "@miden-sdk/react@0.15.2":
-  version "0.15.2"
-  resolved "https://registry.npmjs.org/@miden-sdk/react/-/react-0.15.2.tgz"
-  integrity sha512-L3vxV2QRE+qQ9YPo4VIsCfQ7u12oN0fGp8oRnUGAgSwT1oztHx/rOku02ggAdy1SWQnpe8AiUGiFfC9lNoXkqg==
+"@miden-sdk/react@^0.15.1", "@miden-sdk/react@0.15.4":
+  version "0.15.4"
+  resolved "https://registry.npmjs.org/@miden-sdk/react/-/react-0.15.4.tgz"
+  integrity sha512-7sqzX7yaifODhTdXgglVChSVqj1A0eW3JRAlLTXh9n37BrJDq4rJ8nQR3MATQyz9lQ5usXZQeTo8qPOloJbkHA==
   dependencies:
     zustand "^5.0.0"
 
-"@miden-sdk/vite-plugin@0.15.2":
-  version "0.15.2"
-  resolved "https://registry.npmjs.org/@miden-sdk/vite-plugin/-/vite-plugin-0.15.2.tgz"
-  integrity sha512-55tU2SjA5x9fYHZFKQ/+rM3mhPunUYCqgKsq2sU4hZk+absvmV0Q2ioeiu/C3cjhvmJYO5xqcNSznYaZPnfleg==
+"@miden-sdk/vite-plugin@0.15.4":
+  version "0.15.4"
+  resolved "https://registry.npmjs.org/@miden-sdk/vite-plugin/-/vite-plugin-0.15.4.tgz"
+  integrity sha512-JmkYGDb0f2vtJ7YYoC1S0mOCOdhI0Qyr1ccoBP+F8qFGqPYY2Pnzk5MbJaB2DvQKSDsXPF/zth440tnlq+S0bw==
 
 "@noble/curves@^1.9.7":
   version "1.9.7"

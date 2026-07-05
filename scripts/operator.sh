@@ -15,7 +15,7 @@
 set -u
 cd "$(dirname "$0")/.."
 
-MARKET="${MARKET:-0x5ff0303f0b795d1039ca5b51d8480b}"   # the market the web app reads
+MARKET="${MARKET:-0xabbba77bce4bc6d1795be21b30fa5e}"   # the market the web app reads
 SIDE="${1:-yes}"
 MC="${MIDEN_CLI:-$HOME/.cargo/bin/miden-client}"
 RUN=./client/target/debug/run_script

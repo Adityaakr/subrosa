@@ -1,13 +1,13 @@
 [package]
 name = "place_note"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [lib]
 crate-type = ["cdylib"]
 
 [dependencies]
-miden = { version = "0.12" }
+miden = { version = "0.13" }
 
 [package.metadata.component]
 package = "miden:place-note"

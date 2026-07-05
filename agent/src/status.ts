@@ -19,6 +19,7 @@ export type AgentStatus = {
   tradesPlaced: number;
   budgetSpentObx: string;
   lastOdds: { yes: string; no: string; resolution: string; yesPct: number | null };
+  polymarket: { slug: string; conditionId: string; yesPct: number; updatedAt: string | null } | null;
   lastDecision: string | null;
   lastTx: string | null;
   halted: string | null;

@@ -22,19 +22,27 @@ const guardianTarget = process.env.GUARDIAN_URL || "http://localhost:3000";
 const guardianProxy = {
   "/guardian": { target: guardianTarget, changeOrigin: true, ws: false, rewrite: (p: string) => p.replace(/^\/guardian/, "") },
 };
+const polymarketProxy = {
+  "/api/polymarket": {
+    target: "https://gamma-api.polymarket.com",
+    changeOrigin: true,
+    ws: false,
+    rewrite: (p: string) => p.replace(/^\/api\/polymarket/, ""),
+  },
+};
 
 export default defineConfig({
   plugins: [react(), midenVitePlugin({ crossOriginIsolation: false })],
   server: {
     headers: coiHeaders,
-    proxy: guardianProxy,
+    proxy: { ...guardianProxy, ...polymarketProxy },
   },
   // `vite preview` is the production server on Railway: it must send the same
   // cross-origin-isolation headers AND proxy /guardian, and accept the Railway
   // public hostname. (Set `host` + `--port $PORT` via the start command.)
   preview: {
     headers: coiHeaders,
-    proxy: guardianProxy,
+    proxy: { ...guardianProxy, ...polymarketProxy },
     allowedHosts: true,
   },
   resolve: {

@@ -6,7 +6,9 @@
 //! A PUBLIC account holding the per-outcome reserves that back a trivial CPMM.
 //! The reserves are public on purpose: that is what makes the *odds* trustworthy.
 //! The trader's position (which side, how much, who) is carried separately as a
-//! PRIVATE note, so it is only ever a commitment on-chain.
+//! programmable note. The current operator beta uses public execution notes;
+//! private/encrypted transport can replace that routing without changing this
+//! collateral-enforcing account component.
 //!
 //! Trivial CPMM for v1 (spec §9.3): a buy simply adds `amount` to the chosen
 //! outcome's reserve. Implied odds are derived OFF-chain from the public
@@ -21,7 +23,7 @@
 
 extern crate alloc;
 
-use miden::{component, felt, Felt, StorageValue};
+use miden::{active_note, component, component_storage, felt, native_account, Felt, StorageValue};
 
 // Outcome encoding passed to `place`: YES = 1, NO = 0 (compared inline; `felt!`
 // is not const-callable so it can't be a `const`).
@@ -29,8 +31,8 @@ use miden::{component, felt, Felt, StorageValue};
 // Resolution encoding (public storage `resolution`):
 //   0 = Unresolved, 1 = ResolvedYes, 2 = ResolvedNo.
 
-#[component]
-struct Market {
+#[component_storage]
+struct MarketStorage {
     #[storage(description = "YES outcome reserve (public)")]
     yes_reserve: StorageValue<Felt>,
     #[storage(description = "NO outcome reserve (public)")]
@@ -41,25 +43,37 @@ struct Market {
     resolution: StorageValue<Felt>,
 }
 
+/// Public API implemented by every Subrosa market account.
 #[component]
-impl Market {
+trait Market {
+    fn get_yes_reserve(&self) -> Felt;
+    fn get_no_reserve(&self) -> Felt;
+    fn get_total_volume(&self) -> Felt;
+    fn get_resolution(&self) -> Felt;
+    fn resolve(&mut self, outcome: Felt);
+    fn place(&mut self, side: Felt) -> Felt;
+    fn redeem(&self, outcome: Felt, shares: Felt) -> Felt;
+}
+
+#[component]
+impl Market for MarketStorage {
     /// Public: current YES reserve.
-    pub fn get_yes_reserve(&self) -> Felt {
+    fn get_yes_reserve(&self) -> Felt {
         self.yes_reserve.get()
     }
 
     /// Public: current NO reserve.
-    pub fn get_no_reserve(&self) -> Felt {
+    fn get_no_reserve(&self) -> Felt {
         self.no_reserve.get()
     }
 
     /// Public: cumulative traded volume.
-    pub fn get_total_volume(&self) -> Felt {
+    fn get_total_volume(&self) -> Felt {
         self.total_volume.get()
     }
 
     /// Public: resolution state (0 = unresolved, 1 = YES won, 2 = NO won).
-    pub fn get_resolution(&self) -> Felt {
+    fn get_resolution(&self) -> Felt {
         self.resolution.get()
     }
 
@@ -70,7 +84,7 @@ impl Market {
     /// market is already resolved, so the outcome can't be flipped after the
     /// fact. Once set, the redemption guard (position note script) pays out only
     /// the winning side.
-    pub fn resolve(&mut self, outcome: Felt) {
+    fn resolve(&mut self, outcome: Felt) {
         // one-shot: must currently be Unresolved (0)
         assert!(self.resolution.get() == felt!(0));
         // outcome must be YES (1) or NO (2)
@@ -78,16 +92,30 @@ impl Market {
         self.resolution.set(outcome);
     }
 
-    /// Place a position on `side` (YES = 1, NO = 0) of size `amount`.
+    /// Place a position on `side` (YES = 1, NO = 0), collateralized by the
+    /// active note's single fungible asset.
     ///
     /// Trivial CPMM: add `amount` to the chosen outcome's reserve, which moves
     /// the public implied odds, and bump total volume. Returns the shares minted
     /// (1:1 with `amount` for v1). The *position itself* is delivered to the
     /// trader as a separate private note — it is never written into this public
     /// account, so no holder/side/size is revealed here.
-    pub fn place(&mut self, side: Felt, amount: Felt) -> Felt {
+    fn place(&mut self, side: Felt) -> Felt {
         // No betting once the market is resolved.
         assert!(self.resolution.get() == felt!(0));
+        assert!(side == felt!(0) || side == felt!(1));
+
+        // Derive the amount from collateral instead of trusting caller input.
+        let assets = active_note::get_assets();
+        assert!(assets.len() == 1);
+        let asset = assets[0];
+        assert!(asset.value[1] == felt!(0));
+        assert!(asset.value[2] == felt!(0));
+        assert!(asset.value[3] == felt!(0));
+        let amount = asset.value[0];
+        assert!(amount != felt!(0));
+        native_account::add_asset(asset);
+
         if side == felt!(1) {
             let r = self.yes_reserve.get();
             self.yes_reserve.set(r + amount);
@@ -108,7 +136,7 @@ impl Market {
     /// v1 keeps payout trivial (1:1 shares) and the pool-payout note plumbing is
     /// a fast-follow; the assertion *is* the trustless settlement rule and is
     /// what this procedure proves on-chain.
-    pub fn redeem(&self, outcome: Felt, shares: Felt) -> Felt {
+    fn redeem(&self, outcome: Felt, shares: Felt) -> Felt {
         let res = self.resolution.get();
         // market must be resolved (1 = YES, 2 = NO; 0 = unresolved → abort)
         assert!(res != felt!(0));

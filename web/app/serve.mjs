@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
 const DIST = join(dirname(fileURLToPath(import.meta.url)), "dist");
 const PORT = Number(process.env.PORT || 4173);
 const GUARDIAN_URL = process.env.GUARDIAN_URL || "";
+const POLYMARKET_URL = "https://gamma-api.polymarket.com";
 
 const COI = {
   "Cross-Origin-Opener-Policy": "same-origin",
@@ -41,6 +42,37 @@ function proxyGuardian(req, res) {
   }, (up) => { res.writeHead(up.statusCode || 502, up.headers); up.pipe(res); });
   upstream.on("error", (e) => { res.writeHead(502, COI).end("guardian proxy error: " + e.message); });
   req.pipe(upstream);
+}
+
+function proxyPolymarket(req, res) {
+  const incoming = new URL(req.url, "http://localhost");
+  if (req.method !== "GET" || incoming.pathname !== "/api/polymarket/markets") {
+    res.writeHead(404, COI).end("not found");
+    return;
+  }
+  const slug = incoming.searchParams.get("slug") || "";
+  if (!/^[a-z0-9-]{1,180}$/.test(slug)) {
+    res.writeHead(400, { ...COI, "Content-Type": "application/json" }).end(JSON.stringify({ error: "invalid slug" }));
+    return;
+  }
+  const target = new URL(`/markets?slug=${encodeURIComponent(slug)}`, POLYMARKET_URL);
+  const upstream = https.request(target, {
+    method: "GET",
+    headers: { accept: "application/json", "user-agent": "subrosa-miden/0.1" },
+  }, (up) => {
+    res.writeHead(up.statusCode || 502, {
+      ...COI,
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "public, max-age=10, stale-while-revalidate=20",
+    });
+    up.pipe(res);
+  });
+  upstream.setTimeout(10_000, () => upstream.destroy(new Error("Polymarket request timed out")));
+  upstream.on("error", (e) => {
+    if (!res.headersSent) res.writeHead(502, { ...COI, "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: e.message }));
+  });
+  upstream.end();
 }
 
 async function serveStatic(req, res) {
@@ -71,5 +103,6 @@ async function serveStatic(req, res) {
 
 http.createServer((req, res) => {
   if (req.url.startsWith("/guardian")) return proxyGuardian(req, res);
+  if (req.url.startsWith("/api/polymarket")) return proxyPolymarket(req, res);
   serveStatic(req, res);
 }).listen(PORT, "0.0.0.0", () => console.log(`subrosa web serving ${DIST} on :${PORT} (guardian → ${GUARDIAN_URL || "unset"})`));

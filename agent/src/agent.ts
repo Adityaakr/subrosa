@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { readMarket, placeAutonomous, type MarketOdds } from "./onchain.js";
 import { decide } from "./strategy.js";
+import { readPolymarketReference, type PolymarketReference } from "./polymarket.js";
 import { llmConfigured } from "./llm.js";
 import {
   AUTONOMOUS_CAP, AGENT_ACCOUNT_HEX, POLL_INTERVAL_MS, OPENROUTER_MODEL,
@@ -37,26 +38,36 @@ const yesPct = (o: MarketOdds): number | null => {
   return t === 0n ? null : Math.round((Number(o.no) / Number(t)) * 1000) / 10;
 };
 
-type TickResult = { halt?: string; decision?: string; tx?: string; odds: MarketOdds };
+type TickResult = { halt?: string; decision?: string; tx?: string; odds: MarketOdds; reference: PolymarketReference | null };
 
 async function tick(): Promise<TickResult> {
   const odds = await readMarket();
+  const reference = await readPolymarketReference().catch((error) => {
+    console.warn("[polymarket] reference unavailable:", error instanceof Error ? error.message : error);
+    return null;
+  });
   const pct = yesPct(odds);
   console.log(`[odds] yes=${odds.yes} no=${odds.no} resolution=${odds.resolution}${pct !== null ? ` · P(YES)=${pct}%` : ""}`);
+  if (reference) console.log(`[polymarket] ${reference.slug} · P(YES)=${(reference.yesPrice * 100).toFixed(1)}% · ${reference.conditionId}`);
 
   // Stand down on a resolved market — nothing left to trade.
   if (odds.resolution !== 0n) {
     console.log("[halt] market resolved — agent stands down");
-    return { halt: "resolved", odds };
+    return { halt: "resolved", odds, reference };
   }
 
-  const d = await decide(odds);
+  const d = await decide(odds, reference);
   if (!d) {
     console.log("[decide] no edge — holding");
-    return { odds };
+    return { odds, reference };
   }
   const decision = `${d.side.toUpperCase()} size=${d.size} OBX — ${d.reason}`;
   console.log(`[decide] ${decision}`);
+
+  if (!AGENT_ENABLED) {
+    console.log(`[read-only] decision recorded; live submission is disabled`);
+    return { decision, odds, reference };
+  }
 
   // Above-cap → programmable-auth guardrail: the agent can't act alone.
   if (d.size > AUTONOMOUS_CAP) {
@@ -65,12 +76,12 @@ async function tick(): Promise<TickResult> {
     if (!multisig) {
       console.log("[cosign] Guardian not configured here (set SUBROSA_MULTISIG for the 2-of-N proposal path).");
       console.log("[cosign] In the dapp this surfaces under Approvals for a human co-sign.");
-      return { decision, odds };
+      return { decision, odds, reference };
     }
     const { proposeAndCoSign } = await import("./guardian.js");
     const r = await proposeAndCoSign({ multisigAccountId: multisig, recipientHex: AGENT_ACCOUNT_HEX, amount: d.size });
     console.log(`[cosign] proposal ${r.proposalId} status=${r.status}` + (r.txId ? ` tx=${r.txId}` : " (awaiting human co-signature)"));
-    return { decision, odds };
+    return { decision, odds, reference };
   }
 
   // Sub-cap autonomous trade. The on-chain stake is fixed per side in v1, so
@@ -78,16 +89,16 @@ async function tick(): Promise<TickResult> {
   const stake = STAKE_OBX[d.side];
   if (tradesPlaced >= MAX_TRADES) {
     console.log(`[halt] reached MAX_TRADES=${MAX_TRADES} — ending session`);
-    return { halt: "max-trades", decision, odds };
+    return { halt: "max-trades", decision, odds, reference };
   }
   if (budgetSpent + stake > BUDGET_OBX) {
     console.log(`[halt] budget ${budgetSpent}+${stake} > ${BUDGET_OBX} OBX — ending session`);
-    return { halt: "budget", decision, odds };
+    return { halt: "budget", decision, odds, reference };
   }
 
   if (DRY_RUN) {
     console.log(`[dry-run] would stake ${stake} OBX ${d.side.toUpperCase()} (no tx submitted)`);
-    return { decision, odds };
+    return { decision, odds, reference };
   }
 
   console.log(`[auto] staking ${stake} OBX ${d.side.toUpperCase()} (≤ cap ${AUTONOMOUS_CAP})`);
@@ -95,7 +106,7 @@ async function tick(): Promise<TickResult> {
   tradesPlaced += 1;
   budgetSpent += stake;
   console.log(`[auto] submitted ${tx} · trades=${tradesPlaced}/${MAX_TRADES} · budget=${budgetSpent}/${BUDGET_OBX} OBX`);
-  return { decision, tx, odds };
+  return { decision, tx, odds, reference };
 }
 
 async function snapshot(r: TickResult | null, err?: unknown): Promise<void> {
@@ -111,6 +122,12 @@ async function snapshot(r: TickResult | null, err?: unknown): Promise<void> {
     tradesPlaced,
     budgetSpentObx: String(budgetSpent),
     lastOdds: { yes: String(o.yes), no: String(o.no), resolution: String(o.resolution), yesPct: yesPct(o) },
+    polymarket: r?.reference ? {
+      slug: r.reference.slug,
+      conditionId: r.reference.conditionId,
+      yesPct: Math.round(r.reference.yesPrice * 10_000) / 100,
+      updatedAt: r.reference.updatedAt,
+    } : null,
     lastDecision: err ? `error: ${err instanceof Error ? err.message : String(err)}` : r?.decision ?? null,
     lastTx: r?.tx ?? null,
     halted: r?.halt ?? null,

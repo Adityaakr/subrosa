@@ -14,6 +14,7 @@ import { MIDEN_CLI, MARKET_ID_HEX, SLOT_YES, SLOT_NO, SLOT_RES } from "./config.
 
 const run = promisify(execFile);
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", ".."); // repo root
+const OPERATOR = resolve(ROOT, "operator");
 
 export type MarketOdds = { yes: bigint; no: bigint; resolution: bigint };
 
@@ -28,10 +29,10 @@ function wordToBigInt(hex: string): bigint {
 }
 
 export async function readMarket(): Promise<MarketOdds> {
-  await run(MIDEN_CLI, ["sync"], { cwd: ROOT }).catch(() => {});
+  await run(MIDEN_CLI, ["sync"], { cwd: OPERATOR }).catch(() => {});
   let stdout = "";
   try {
-    ({ stdout } = await run(MIDEN_CLI, ["account", "-s", MARKET_ID_HEX], { cwd: ROOT }));
+    ({ stdout } = await run(MIDEN_CLI, ["account", "-s", MARKET_ID_HEX], { cwd: OPERATOR }));
   } catch (e) {
     // CLI missing / market not imported / RPC blip: hold this tick rather than
     // throw. Zero reserves → decide() returns null → the loop just waits.

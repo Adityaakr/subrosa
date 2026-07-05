@@ -14,10 +14,21 @@ export const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY ?? "";
 export const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL ?? "openai/gpt-4o-mini";
 // Human-readable question for the market the agent trades (context for the LLM).
 export const MARKET_QUESTION =
-  process.env.SUBROSA_MARKET_QUESTION ?? "Will Miden mainnet launch before Aug 1, 2026?";
+  process.env.SUBROSA_MARKET_QUESTION ?? "Will Morocco win the 2026 FIFA World Cup?";
+
+// Optional Polymarket mirror. This is a public reference/oracle feed; execution
+// remains on Miden and the agent never holds a Polygon trading key.
+export const POLYMARKET_SLUG =
+  process.env.POLYMARKET_SLUG ?? "will-morocco-win-the-2026-fifa-world-cup-464";
+export const POLYMARKET_GAMMA_URL =
+  process.env.POLYMARKET_GAMMA_URL ?? "https://gamma-api.polymarket.com";
+export const POLYMARKET_CONDITION_ID =
+  process.env.POLYMARKET_CONDITION_ID ??
+  "0x37a6de1b21803e5f3fb1965116218215d79963af4f7e51659696366267a63a03";
+export const RESOLUTION_RELAY_ENABLED = process.env.SUBROSA_RESOLUTION_ENABLED === "1";
 
 export const MARKET_ID_HEX =
-  process.env.SUBROSA_MARKET ?? "0x5ff0303f0b795d1039ca5b51d8480b";
+  process.env.SUBROSA_MARKET ?? "0xabbba77bce4bc6d1795be21b30fa5e";
 export const OBX_FAUCET_HEX =
   process.env.SUBROSA_FAUCET ?? "0x1201d9f8819d5220778535e4e2f08a";
 
@@ -40,9 +51,9 @@ export const MIDEN_CLI =
   `${process.env.HOME}/.cargo/bin/miden-client`;
 
 // Storage slot names exported by the market component (public reserves).
-export const SLOT_YES = "miden_market::market::yes_reserve";
-export const SLOT_NO = "miden_market::market::no_reserve";
-export const SLOT_RES = "miden_market::market::resolution";
+export const SLOT_YES = "market::market::yes_reserve";
+export const SLOT_NO = "market::market::no_reserve";
+export const SLOT_RES = "market::market::resolution";
 
 // Loop cadence (ms). Proving + submitting a place tx takes ~1–2 min and ticks
 // never overlap (the next is scheduled only after the current finishes), so the
@@ -54,9 +65,10 @@ export const POLL_INTERVAL_MS = Math.max(
 
 // ── Autonomous-loop safety rails ──────────────────────────────────────────
 // A hands-off agent on testnet needs hard stops so it can't run away.
-// Master switch: SUBROSA_AGENT_ENABLED=0 starts the agent in read-only mode
-// (reads odds + decides, never places). Defaults on.
-export const AGENT_ENABLED = (process.env.SUBROSA_AGENT_ENABLED ?? "1") !== "0";
+// Master switch: live autonomous submission is disabled by default. The
+// current collateralized market accepts execution notes through the operator;
+// the legacy direct transaction scripts must not be used accidentally.
+export const AGENT_ENABLED = (process.env.SUBROSA_AGENT_ENABLED ?? "0") === "1";
 // Decide + log but never submit a real tx (safe to run anywhere).
 export const DRY_RUN = (process.env.SUBROSA_DRY_RUN ?? "0") === "1";
 // Session budget: stop after this many placed trades, or once cumulative staked
@@ -71,3 +83,14 @@ export const STOP_FILE = ".agent-stop";
 // Fixed on-chain stake per side baked into the compiled place_*.masp (v1).
 // Used for budget accounting; the LLM's size drives cap routing (intent).
 export const STAKE_OBX = { yes: 250n, no: 100n } as const;
+
+// Protocol-0.15 custom place-note script roots. The operator consumes only
+// these roots and ignores unrelated P2ID notes that share the market's tag.
+export const PLACE_NOTE_ROOTS = new Set(
+  (process.env.SUBROSA_PLACE_NOTE_ROOTS ??
+    "0xac61f5ee1974cd89501dc3c2a7f5f4ec49f706d823aa91766e86c1e6fa46fa74," +
+    "0xdfe21fc70696fe142fe0fc7922d27fe3d2283e72c0bdb304f651813569fc5261")
+    .split(",")
+    .map((root) => root.trim().toLowerCase())
+    .filter(Boolean),
+);

@@ -1,0 +1,15 @@
+[package]
+name = "place_no_note"
+version = "0.1.0"
+
+[lib]
+kind = "note"
+namespace = "miden:place-no-note/miden-place-no-note@0.1.0"
+
+[dependencies]
+miden-core = "*"
+miden-protocol = "*"
+market = { path = "../../market" }
+
+[package.metadata.miden.dependencies]
+market = { wit = "../../market/target/generated-wit/" }
